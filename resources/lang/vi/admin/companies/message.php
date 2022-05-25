@@ -1,19 +1,19 @@
 <?php
 
 return [
-    'does_not_exist' => 'Công ty này không tồn tại.',
-    'assoc_users'    => 'Công ty này hiện đang liên kết với ít nhất một mô hình và không thể bị xóa. Hãy cập nhật mô hình của bạn để không còn tham khảo công ty này nữa và thử lại.',
+    'does_not_exist' => 'Site này không tồn tại.',
+    'assoc_users'    => 'Site này hiện đang liên kết với ít nhất một mô hình và không thể bị xóa. Hãy cập nhật mô hình của bạn để không còn tham khảo công ty này nữa và thử lại.',
     'create' => [
-        'error'   => 'Công ty chưa được tạo, hãy thử lại.',
-        'success' => 'Công ty thành công.',
+        'error'   => 'Site chưa được tạo, hãy thử lại.',
+        'success' => 'Site thành công.',
     ],
     'update' => [
-        'error'   => 'Công ty không được cập nhật, vui lòng thử lại',
-        'success' => 'Công ty đã được cập nhật thành công.',
+        'error'   => 'Site không được cập nhật, vui lòng thử lại',
+        'success' => 'Site đã được cập nhật thành công.',
     ],
     'delete' => [
-        'confirm' => 'Bạn có chắc chắn muốn xóa công ty này?',
-        'error'   => 'Đã xảy ra sự cố khi xóa công ty. Vui lòng thử lại.',
-        'success' => 'Công ty đã bị xóa thành công.',
+        'confirm' => 'Bạn có chắc chắn muốn xóa Site này?',
+        'error'   => 'Đã xảy ra sự cố khi xóa Site. Vui lòng thử lại.',
+        'success' => 'Site đã bị xóa thành công.',
     ],
 ];
