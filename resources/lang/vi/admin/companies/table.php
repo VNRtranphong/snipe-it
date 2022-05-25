@@ -1,9 +1,9 @@
 <?php
 return array(
-    'companies' => 'Các công ty',
-    'create'    => 'Tạo công ty',
+    'companies' => 'Các Site',
+    'create'    => 'Tạo Site',
     'title'     => 'Công ty',
-    'update'    => 'Cập nhật Công ty',
-    'name'      => 'Tên công ty',
+    'update'    => 'Cập nhật Site',
+    'name'      => 'Tên Site',
     'id'        => 'ID',
 );
