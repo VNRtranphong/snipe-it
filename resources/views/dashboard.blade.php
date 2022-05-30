@@ -29,7 +29,7 @@
 <div class="row">
   <!-- panel -->
     <div class="col-lg-2 col-xs-6">
-      <a href="{{ route('company.index') }}">
+      <a href="{{ route('companies.index') }}">
     <!-- small box -->
     <div class="small-box bg-teal">
       <div class="inner">
