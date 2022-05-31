@@ -29,7 +29,7 @@
 <div class="row">
   <!-- panel -->
     <div class="col-lg-2 col-xs-6">
-      <a href="{{ route('company.index') }}">
+      <a href="{{ route('companies.index') }}">
     <!-- small box -->
     <div class="small-box bg-teal">
       <div class="inner">
@@ -40,7 +40,7 @@
         <i class="fas fa-barcode" aria-hidden="true"></i>
       </div>
       @can('index', \App\Models\Company::class)
-        <a href="{{ route('company.index') }}" class="small-box-footer">{{ trans('general.view_all') }} <i class="fa fa-arrow-circle-right" aria-hidden="true"></i></a>
+        <a href="{{ route('companies.index') }}" class="small-box-footer">{{ trans('general.view_all') }} <i class="fa fa-arrow-circle-right" aria-hidden="true"></i></a>
       @endcan
     </div>
       </a>
