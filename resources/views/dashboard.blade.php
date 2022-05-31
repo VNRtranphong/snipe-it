@@ -289,19 +289,19 @@
                     <div class="col-md-12">
                         <div class="table-responsive">
                         <table
-                                data-cookie-id-table="dashLocationSummary"
+                                data-cookie-id-table="dashCompanySummary"
                                 data-height="400"
                                 data-pagination="true"
                                 data-side-pagination="server"
                                 data-sort-order="desc"
                                 data-sort-field="assets_count"
-                                id="dashLocationSummary"
+                                id="dashCompanySummary"
                                 class="table table-striped snipe-table"
                                 data-url="{{ route('api.companies.index', ['sort' => 'assets_count', 'order' => 'asc']) }}">
 
                             <thead>
                             <tr>
-                                <th class="col-sm-3" data-visible="true" data-field="name" data-formatter="locationsLinkFormatter" data-sortable="true">{{ trans('general.name') }}</th>
+                                <th class="col-sm-3" data-visible="true" data-field="name" data-formatter="companiesLinkFormatter" data-sortable="true">{{ trans('general.name') }}</th>
                                 
                                 <th class="col-sm-1" data-visible="true" data-field="assets_count" data-sortable="true">
                                     <i class="fas fa-barcode" aria-hidden="true"></i>
