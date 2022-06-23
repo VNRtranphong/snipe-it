@@ -8,7 +8,7 @@
 @stop
 
 @section('header_right')
-  @can('superuser')
+  @can('update', \App\Models\AssetModel::class)
   <div class="btn-group pull-right">
      <button class="btn btn-default dropdown-toggle" data-toggle="dropdown">{{ trans('button.actions') }}
           <span class="caret"></span>
@@ -56,7 +56,11 @@
                   data-search="true"
                   data-side-pagination="server"
                   data-show-columns="true"
-                  data-toolbar="#toolbar"
+                  data-show-fullscreen="true"
+                  data-toolbar="#assetsBulkEditToolbar"
+                  data-bulk-button-id="#bulkAssetEditButton"
+                  data-bulk-form-id="#assetsBulkForm"
+                  data-click-to-select="true"
                   data-show-export="true"
                   data-show-refresh="true"
                   data-sort-order="asc"

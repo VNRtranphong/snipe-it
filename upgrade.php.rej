@@ -1,0 +1,42 @@
+--- upgrade.php
++++ upgrade.php
+@@ -217,36 +56,13 @@ if (file_exists('composer.phar')) {
+     $composer_update = shell_exec('php composer.phar self-update');
+     echo $composer_update."\n\n";
+ 
+-
+-
+-    // Use --no-dev only if we are in production mode.
+-    // This will cause errors otherwise, if the user is in develop or local for their APP_ENV
+-    if ($app_environment == 'production') {
+-        $composer = shell_exec('php composer.phar install --no-dev --prefer-source');
+-    } else {
+-        $composer = shell_exec('php composer.phar install --prefer-source');
+-    }
+     $composer_dump = shell_exec('php composer.phar dump');
+-
+-
++    $composer = shell_exec('php composer.phar install --no-dev --prefer-source');
+ 
+ } else {
+-
+-    echo "-- We couldn't find a local composer.phar. No worries, trying globally.\n";
+-    echo "Since you are running composer globally, we won't try to update it for you.\n";
+-    echo "If you run into issues with this step, try running `composer self-update` \n";
+-    echo "before running this updater again\n\n";
+-
+-    if ($app_environment == 'production') {
+-        $composer = shell_exec('composer install --no-dev --prefer-source');
+-    } else {
+-        $composer = shell_exec('composer install --prefer-source');
+-    }
+-
++    echo "-- We couldn't find a local composer.phar. No worries, trying globally.\n\n";
+     $composer_dump = shell_exec('composer dump');
+-
+-
+-
++    $composer = shell_exec('composer install --no-dev --prefer-source');
+ }
+ 
+ echo $composer_dump."\n";
