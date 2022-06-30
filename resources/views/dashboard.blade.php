@@ -33,7 +33,7 @@
     <!-- small box -->
     <div class="small-box bg-teal">
       <div class="inner">
-        <h3>{{ number_format($counts['asset']) }}</h3>
+        <h3>{{ number_format(\App\Models\Asset::AssetsForShow()->count()) }}</h3>
         <p>{{ strtolower(trans('general.assets')) }}</p>
       </div>
       <div class="icon" aria-hidden="true">
@@ -427,6 +427,7 @@
                   maintainAspectRatio: true,
               }
           };
+
       $.ajax({
           type: 'GET',
           url: '{{  route('api.statuslabels.assets.bytype') }}',
