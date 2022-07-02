@@ -2,7 +2,7 @@
 return array(
     'companies' => 'Các Site',
     'create'    => 'Tạo Site',
-    'title'     => 'Công ty',
+    'title'     => 'Site',
     'update'    => 'Cập nhật Site',
     'name'      => 'Tên Site',
     'id'        => 'ID',

@@ -74,6 +74,7 @@ class AssetMaintenance extends Model implements ICompanyableChild
             trans('admin/asset_maintenances/general.maintenance') => trans('admin/asset_maintenances/general.maintenance'),
             trans('admin/asset_maintenances/general.repair')      => trans('admin/asset_maintenances/general.repair'),
             trans('admin/asset_maintenances/general.upgrade')     => trans('admin/asset_maintenances/general.upgrade'),
+            'LDM'      				 => 'LDM',
             'HDD'                    => 'HDD',
             'Power supplier'         => 'Power supplier',
             'Main board'             => 'Main board',
