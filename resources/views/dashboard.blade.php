@@ -213,7 +213,7 @@
 
                 <table
                     data-cookie-id-table="dashActivityReport"
-                    data-height="350"
+                    data-height="450"
                     data-pagination="false"
                     data-id-table="dashActivityReport"
                     data-side-pagination="server"
