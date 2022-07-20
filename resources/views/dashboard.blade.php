@@ -120,18 +120,18 @@
  </div><!-- ./col -->
 
  <div class="col-lg-2 col-xs-6">
-    <a href="{{ route('users.index') }}">
+    <a href="{{ route('companies.index') }}">
    <!-- small box -->
    <div class="small-box bg-light-blue">
      <div class="inner">
-       <h3>{{ number_format($counts['user']) }}</h3>
-       <p>{{ strtolower(trans('general.people')) }}</p>
+       <h3>{{ number_format($counts['Company']) }}</h3>
+       <p>{{ strtolower(trans('general.Site')) }}</p>
      </div>
      <div class="icon" aria-hidden="true">
        <i class="fas fa-users"></i>
      </div>
        @can('view', \App\Models\License::class)
-         <a href="{{ route('users.index') }}" class="small-box-footer">{{ trans('general.view_all') }} <i class="fa fa-arrow-circle-right" aria-hidden="true"></i></a>
+         <a href="{{ route('companies.index') }}" class="small-box-footer">{{ trans('general.view_all') }} <i class="fa fa-arrow-circle-right" aria-hidden="true"></i></a>
        @endcan
    </div>
     </a>

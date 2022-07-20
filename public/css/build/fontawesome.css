@@ -3371,6 +3371,11 @@
 .fa-save:before {
   content: "\f0c7";
 }
+
+.fa-save1:before {
+  content: "\f0c8";
+}
+
 .fa-schlix:before {
   content: "\f3ea";
 }
