@@ -399,6 +399,16 @@
               </a>
             </li>
             @endcan
+			
+            @can('view', \App\Models\Company::class)
+            <li{!! (Request::is('companies*') ? ' class="active"' : '') !!}>
+               <a href="{{ route('companies.index') }}">
+                 <i class="far fa-save fa-fw"></i>
+                    <span>{{ trans('general.companies') }}</span>
+                  </a>
+              </li>
+            @endcan
+			
             @can('index', \App\Models\Asset::class)
             <li class="treeview{{ (Request::is('hardware*') ? ' active' : '') }}">
                 <a href="#"><i class="fas fa-barcode fa-fw" aria-hidden="true"></i>
