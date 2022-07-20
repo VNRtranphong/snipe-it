@@ -3374,6 +3374,9 @@ readers do not read off random characters that represent icons */
 
 .fa-save:before {
   content: "\f0c7"; }
+  
+.fa-save1:before {
+  content: "\f0c8"; }
 
 .fa-schlix:before {
   content: "\f3ea"; }

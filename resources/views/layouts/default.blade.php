@@ -403,7 +403,7 @@
             @can('view', \App\Models\Company::class)
             <li{!! (Request::is('companies*') ? ' class="active"' : '') !!}>
                <a href="{{ route('companies.index') }}">
-                 <i class="far fa-save fa-fw"></i>
+                 <i class="far fa-save1 fa-fw"></i>
                     <span>{{ trans('general.companies') }}</span>
                   </a>
               </li>
