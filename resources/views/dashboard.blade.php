@@ -125,7 +125,7 @@
    <div class="small-box bg-light-blue">
      <div class="inner">
        <h3>{{ number_format($counts['Company']) }}</h3>
-       <p>{{ strtolower(trans('general.Site')) }}</p>
+       <p>{{ strtolower(trans('general.companies')) }}</p>
      </div>
      <div class="icon" aria-hidden="true">
        <i class="fas fa-users"></i>
