@@ -98,8 +98,9 @@ class AssetMaintenance extends Model implements ICompanyableChild
             'Fans'                   => 'Fans',
             'Other'                  => 'Other',
             trans('admin/asset_maintenances/general.calibration')     => trans('admin/asset_maintenances/general.calibration'),
-            'Software Support'      => trans('admin/asset_maintenances/general.software_support'),
-            'Hardware Support'      => trans('admin/asset_maintenances/general.hardware_support'),
+            trans('admin/asset_maintenances/general.software_support')      => trans('admin/asset_maintenances/general.software_support'),
+            trans('admin/asset_maintenances/general.hardware_support')      => trans('admin/asset_maintenances/general.hardware_support'),
+            trans('admin/asset_maintenances/general.configuration_change')     => trans('admin/asset_maintenances/general.configuration_change'),
         ];
     }
 

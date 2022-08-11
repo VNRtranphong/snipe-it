@@ -316,11 +316,14 @@
                              {{ trans('general.viewassets') }}
                        </a></li>
 
+                     @can('viewRequestable', \App\Models\Asset::class)
                      <li {!! (Request::is('account/requested') ? ' class="active"' : '') !!}>
                          <a href="{{ route('account.requested') }}">
                              <i class="fas fa-check fa-disk fa-fw" aria-hidden="true"></i>
                              {{ trans('general.requested_assets_menu') }}
                          </a></li>
+                     @endcan
+                     
                      <li {!! (Request::is('account/accept') ? ' class="active"' : '') !!}>
                          <a href="{{ route('account.accept') }}">
                              <i class="fas fa-check fa-disk fa-fw"></i>
@@ -354,11 +357,11 @@
                      <li class="divider"></li>
                      <li>
 
-                        <a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                        <a href="{{ route('logout.get') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                             <i class="fa fa-sign-out fa-fw"></i> {{ trans('general.logout') }}
                         </a>
                         
-                        <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+                        <form id="logout-form" action="{{ route('logout.post') }}" method="POST" style="display: none;">
                             {{ csrf_field() }}
                         </form>
 
@@ -399,16 +402,14 @@
               </a>
             </li>
             @endcan
-			
             @can('view', \App\Models\Company::class)
             <li{!! (Request::is('companies*') ? ' class="active"' : '') !!}>
                <a href="{{ route('companies.index') }}">
-                 <i class="far fa-save1 fa-fw"></i>
+                 <i class="far fa-save fa-fw"></i>
                     <span>{{ trans('general.companies') }}</span>
                   </a>
               </li>
             @endcan
-			
             @can('index', \App\Models\Asset::class)
             <li class="treeview{{ (Request::is('hardware*') ? ' active' : '') }}">
                 <a href="#"><i class="fas fa-barcode fa-fw" aria-hidden="true"></i>
@@ -496,7 +497,7 @@
 
                     @can('checkout', \App\Models\Asset::class)
                     <li{!! (Request::is('hardware/bulkcheckout') ? ' class="active"' : '') !!}>
-                        <a href="{{ route('hardware/bulkcheckout') }}">
+                        <a href="{{ route('hardware.bulkcheckout.show') }}">
                             {{ trans('general.bulk_checkout') }}
                         </a>
                     </li>
