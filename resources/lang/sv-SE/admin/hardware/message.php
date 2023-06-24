@@ -16,12 +16,14 @@ return [
         'error'   			=> 'Tillgången var inte uppdaterad, försök igen',
         'success' 			=> 'Asset uppdaterad framgångsrikt.',
         'nothing_updated'	=>  'Inga fält valdes, så ingenting uppdaterades.',
-        'no_assets_selected'  =>  'No assets were selected, so nothing was updated.',
+        'no_assets_selected'  =>  'Inga tillgångar valdes, så ingenting uppdaterades.',
     ],
 
     'restore' => [
         'error'   		=> 'Tillgången återställdes inte, försök igen',
         'success' 		=> 'Tillgången återställs framgångsrikt.',
+        'bulk_success' 		=> 'Återställning av tillgång lyckades.',
+        'nothing_updated'   => 'Inga tillgångar valdes, så ingenting återställdes.', 
     ],
 
     'audit' => [
@@ -48,6 +50,8 @@ return [
         'success'               => 'Din fil har importerats',
         'file_delete_success'   => 'Din fil har tagits bort',
         'file_delete_error'      => 'Filen kunde inte raderas',
+        'header_row_has_malformed_characters' => 'Ett eller flera attribut i rubrikraden innehåller felaktigt formatterade UTF-8-tecken',
+        'content_row_has_malformed_characters' => 'Ett eller flera attribut i den första raden av innehållet innehåller felaktigt formatterade UTF-8-tecken',
     ],
 
 

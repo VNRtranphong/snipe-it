@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Активът беше отказан.',
     'bulk_manager_warn'	        => 'Вашите потребителски профили бяха обновени успешно, обаче вашето управителско вписване не беше запазено, защото управителят, които сте избрали бе в списъка с потребителски профили за промяна и потребителите не могат да бъдат свои управители. Моля изберете вашите потребителски профили отново, с изключение на управителя.',
     'user_exists'               => 'Потребителят вече съществува!',
-    'user_not_found'            => 'Потребител [:id] не съществува.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Полето за вход е задължително',
     'user_password_required'    => 'Паролата е задължителна.',
     'insufficient_permissions'  => 'Нямате необходимите права.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'Избраните потребители, които са активирани и имат валиден е-майл адрес им беше изпратен линк за смяна на парола.',
     'password_reset_sent'       => 'A password reset link has been sent to :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Един или повече файлове са твърде големи или с неразрешен тип. Разрешените типове файлове са png, gif, jpg, doc, docx, pdf, и txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

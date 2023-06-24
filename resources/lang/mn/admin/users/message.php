@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Та энэ хөрөнгийг амжилттай татгалзсан.',
     'bulk_manager_warn'	        => 'Таны хэрэглэгчид амжилттай шинэчлэгдсэн хэдий ч таны менежерийн оруулгыг хадгалсангүй, учир нь таны сонгосон менежер засварлах хэрэглэгчийн жагсаалт мөн хэрэглэгчид магадгүй өөрийн менежер биш байж болно. Менежерийг оруулалгүйгээр хэрэглэгчдийг дахин сонгоно уу.',
     'user_exists'               => 'Хэрэглэгч бүртгэгдсэн байна!',
-    'user_not_found'            => 'Хэрэглэгч [: id] байхгүй байна.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Нэвтрэх талбар шаардлагатай байна',
     'user_password_required'    => 'Нууц үг шаардагдана.',
     'insufficient_permissions'  => 'Зөвшөөрөлгүй байна.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'The selected users who are activated and have a valid email addresses have been sent a password reset link.',
     'password_reset_sent'       => 'A password reset link has been sent to :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Таны файлуудын нэг юмуу хэд нь хэтэрхий том юмуу эсвэл файлын төрлийг зөвшөөрдөггүй. Зөвшөөрөгдсөн filetypes нь png, gif, jpg, doc, docx, pdf, болон txt байна.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

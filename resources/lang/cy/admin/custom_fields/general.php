@@ -27,6 +27,9 @@ return [
     'used_by_models'   		    => 'Defnyddir gan modelau',
     'order'   		            => 'Trefn',
     'create_fieldset'         => 'Set maes newydd',
+    'update_fieldset'         => 'Update Fieldset',
+    'fieldset_does_not_exist'   => 'Fieldset :id does not exist',
+    'fieldset_updated'         => 'Fieldset updated',
     'create_fieldset_title' => 'Create a new fieldset',
     'create_field'            => 'Maes Addasedig newydd',
     'create_field_title' => 'Create a new custom field',
@@ -44,4 +47,8 @@ return [
     'db_convert_warning' => 'WARNING. This field is in the custom fields table as <code>:db_column</code> but should be <code>:expected</code>.',
     'is_unique' => 'This value must be unique across all assets',
     'unique' => 'Unique',
+    'display_in_user_view' => 'Allow the checked out user to view these values in their View Assigned Assets page',
+    'display_in_user_view_table' => 'Visible to User',
+    'auto_add_to_fieldsets' => 'Automatically add this to every new fieldset',
+    'add_to_preexisting_fieldsets' => 'Add to any existing fieldsets',
 ];

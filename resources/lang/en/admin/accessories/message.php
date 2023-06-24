@@ -24,6 +24,7 @@ return array(
      'checkout' => array(
         'error'   		=> 'Accessory was not checked out, please try again',
         'success' 		=> 'Accessory checked out successfully.',
+        'unavailable'   => 'Accessory is not available for checkout. Check quantity available',
         'user_does_not_exist' => 'That user is invalid. Please try again.'
     ),
 
@@ -31,8 +32,7 @@ return array(
         'error'   		=> 'Accessory was not checked in, please try again',
         'success' 		=> 'Accessory checked in successfully.',
         'user_does_not_exist' => 'That user is invalid. Please try again.'
-    ),
-
+    )
 
 
 );

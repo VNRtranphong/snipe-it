@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Rydych wedi llwyddo I wrthod yr ased yma.',
     'bulk_manager_warn'	        => 'Mae eich defnyddwyr wedi diweddaru\'n llwyddiannus ond mae\'r blwch rheolwr heb newid gan fod y rheolwr yn y rhestr o defnyddwyr. Dewisiwch eto heb cynnwys y rheolwr.',
     'user_exists'               => 'Defnyddiwr yn bodoli yn barod!',
-    'user_not_found'            => 'Nid yw defnyddiwr [:id] yn bodoli.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Mae angen llenwi\'r maes login',
     'user_password_required'    => 'Rhaid gosod cyfrinair.',
     'insufficient_permissions'  => 'Diffyg Hawliau.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'The selected users who are activated and have a valid email addresses have been sent a password reset link.',
     'password_reset_sent'       => 'A password reset link has been sent to :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Mae un neu mwy o\'r ffeiliau unai yn rhy fawr neu ddim y math cywir. Derbynir png, gif, fjp, doc, docx, pdf a txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

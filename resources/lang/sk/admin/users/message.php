@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Odmietnutie majetku bolo úspešné.',
     'bulk_manager_warn'	        => 'Používatelia boli úspešné aktualizovaný, avčak položka manažér nebola uložená, pretože zvolený manažér sa taktiež nachádzal v zoznam na úpravu a používatel nemôže byť sám sebe manazérom. Prosim zvoľte Vašich používateľov znovu s vynechaním manažéera.',
     'user_exists'               => 'Používateľ už existuje!',
-    'user_not_found'            => 'Používateľ [:id] neexistuje.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Prihlasovacie meno je povinné',
     'user_password_required'    => 'Heslo je povinné.',
     'insufficient_permissions'  => 'Nedostatočné oprávnenia.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'Vybraní používatelia sú aktivovaný. Na ich adresu bola zaslaný okaz na resetovanie hesla.',
     'password_reset_sent'       => 'A password reset link has been sent to :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Jeden alebo viacero Vašich súborov je príliš veľkých alebo nie su podporované. Podporované typy súborov sú png, gif, jpg, doc, docx, pdf a txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

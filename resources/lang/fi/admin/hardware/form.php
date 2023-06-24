@@ -2,11 +2,14 @@
 
 return [
     'bulk_delete'		=> 'Vahvista laitteiden massapoisto',
+    'bulk_restore'      => 'Confirm Bulk Restore Assets', 
   'bulk_delete_help'	=> 'Tarkasta alla olevat massapoistettavat laitteet. Kun nämä laitteet on poistettu, ne voidaan palauttaa, mutta niitä ei enää yhdistetä niihin käyttäjiin, joille ne on tällä hetkellä luovutettuna.',
+  'bulk_restore_help'	=> 'Review the assets for bulk restoration below. Once restored, these assets will not be associated with any users they were previously assigned to.',
   'bulk_delete_warn'	=> 'Olet poistamassa :asset_count laitetta.',
+  'bulk_restore_warn'	=> 'You are about to restore :asset_count assets.',
     'bulk_update'		=> 'Massapäivitä laitteita',
     'bulk_update_help'	=> 'Tämän lomakkeen avulla voit päivittää useita laitteita kerralla. Täytä vain ne kentät joita haluat muuttaa. Tyhjäksi jätettyjä kenttiä ei päivitetä. ',
-    'bulk_update_warn'	=> 'You are about to edit the properties of a single asset.|You are about to edit the properties of :asset_count assets.',
+    'bulk_update_warn'	=> 'Olet muokkaamassa yhden laitteen ominaisuuksia.- Olet muokkaamassa :asset_count laitteen ominaisuuksia.',
     'checkedout_to'		=> 'Luovutettuna',
     'checkout_date'		=> 'Luovutuspäivä',
     'checkin_date'		=> 'Palautuspäivä',
@@ -40,12 +43,12 @@ return [
     'warranty'			=> 'Takuu',
         'warranty_expires'		=> 'Takuu päättyy',
     'years'				=> 'vuotta',
-    'asset_location' => 'Update Asset Location',
-    'asset_location_update_default_current' => 'Update default location AND actual location',
-    'asset_location_update_default' => 'Update only default location',
-    'asset_not_deployable' => 'That asset status is not deployable. This asset cannot be checked out.',
-    'asset_deployable' => 'That status is deployable. This asset can be checked out.',
-    'processing_spinner' => 'Processing...',
-    'optional_infos'  => 'Optional Information',
-    'order_details'   => 'Order Related Information'
+    'asset_location' => 'Päivitä sijainti',
+    'asset_location_update_default_current' => 'Päivitä oletussijainti ja todellinen sijainti',
+    'asset_location_update_default' => 'Päivitä vain oletussijainti',
+    'asset_not_deployable' => 'Laite ei ole käyttöönotettavissa. Laitetta ei voida luovuttaa.',
+    'asset_deployable' => 'Laite on käyttöönotettavissa. Laite voidaan luovuttaa.',
+    'processing_spinner' => 'Processing... (This might take a bit of time on large files)',
+    'optional_infos'  => 'Valinnaiset tiedot',
+    'order_details'   => 'Tilaukseen liityvät tiedot'
 ];

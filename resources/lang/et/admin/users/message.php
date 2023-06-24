@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Oled selle vahendi tagasi lükanud.',
     'bulk_manager_warn'	        => 'Sinu kasutajad on edukalt muudetud, kuid sinu juhi-kirjet ei salvestatud sest juht, kelle valisid oli ka muudatavate kasutajate hulgas ning kasutaja ei või olla ise-enda juht. Palun vali oma kasutajad uuesti, jättes juhi kõrvale.',
     'user_exists'               => 'Kasutaja on juba olemas!',
-    'user_not_found'            => 'Kasutajat [:id] ei ole olemas.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Login väli on kohustuslik',
     'user_password_required'    => 'Parooli väli on kohustuslik.',
     'insufficient_permissions'  => 'Ebapiisavad õigused.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'Parooli taastamise link on saadetud valitud aktiivsetele kasutajatele kellel on õige emaili aadress.',
     'password_reset_sent'       => 'Parooli taastamise aadress on saadetud :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Üks või mitu sinu failidest on kas liiga suured või ei ole lubatud tüüpi. Lubatud tüübid on png, gif, jpg, doc, docx, pdf ja txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

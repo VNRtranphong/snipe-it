@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Uye wenqaba ngempumelelo le mali.',
     'bulk_manager_warn'	        => 'Abasebenzisi bakho babuyekezwe ngempumelelo, kodwa ukungena kwakho kwemenenja akulondoloziwe ngoba umphathi oyikhethile naye ohlwini lomsebenzisi oluzohlelwa, futhi abasebenzisi bangase bangabi umphathi wabo. Sicela ukhethe abasebenzisi bakho futhi, ngaphandle kwamenenja.',
     'user_exists'               => 'Umsebenzisi usuvele ukhona!',
-    'user_not_found'            => 'Umsebenzisi [: id] akekho.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Insimu yokungena ngemvume iyadingeka',
     'user_password_required'    => 'Iphasiwedi iyadingeka.',
     'insufficient_permissions'  => 'Izimvume ezinganele.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'The selected users who are activated and have a valid email addresses have been sent a password reset link.',
     'password_reset_sent'       => 'A password reset link has been sent to :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Ifayela elilodwa noma ngaphezulu likhulu kakhulu noma ifayelathi engavumelekile. Amafayela afakiwe avunyelwe i-png, i-gif, i-jpg, i-doc, i-docx, i-pdf, ne-txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

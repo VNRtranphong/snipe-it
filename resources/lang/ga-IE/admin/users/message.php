@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Dhiúltaigh tú an tsócmhainn seo go rathúil.',
     'bulk_manager_warn'	        => 'Rinneadh do chuid úsáideoirí a nuashonrú go rathúil, áfach, níor shábháil do iontráil bainisteora toisc go raibh an bainisteoir a roghnaigh tú chomh maith sa liosta úsáideora le bheith in eagar, agus b\'fhéidir nach mbainfeadh úsáideoirí a mbainisteoir féin. Roghnaigh d\'úsáideoirí arís, gan an bainisteoir a áireamh.',
     'user_exists'               => 'Úsáideoir ann cheana!',
-    'user_not_found'            => 'Ní Úsáideoir [: id] ann.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Is gá an réimse logála isteach',
     'user_password_required'    => 'Tá an focal faire ag teastáil.',
     'insufficient_permissions'  => 'Ceadanna Easpa.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'The selected users who are activated and have a valid email addresses have been sent a password reset link.',
     'password_reset_sent'       => 'A password reset link has been sent to :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Tá ceann amháin nó níos mó de do chuid comhad ró-mhór nó is comhad í nach bhfuil ceadaithe. Tá píopaí comhaid a cheadaítear png, gif, jpg, doc, docx, pdf, and txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

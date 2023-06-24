@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Jy het hierdie bate suksesvol geweier.',
     'bulk_manager_warn'	        => 'Jou gebruikers is suksesvol opgedateer, maar jou bestuurderinskrywing is nie gestoor nie, want die bestuurder wat jy gekies het, was ook in die gebruikerslys om geredigeer te word, en gebruikers mag nie hul eie bestuurder wees nie. Kies asseblief u gebruikers weer, behalwe die bestuurder.',
     'user_exists'               => 'Gebruiker bestaan ​​reeds!',
-    'user_not_found'            => 'Gebruiker [: id] bestaan ​​nie.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Die aanmeldingsveld is nodig',
     'user_password_required'    => 'Die wagwoord is nodig.',
     'insufficient_permissions'  => 'Onvoldoende Toestemmings.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'The selected users who are activated and have a valid email addresses have been sent a password reset link.',
     'password_reset_sent'       => 'A password reset link has been sent to :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Een of meer van jou lêers is te groot of is \'n filetipe wat nie toegelaat word nie. Toegelate filetipes is png, gif, jpg, doc, docx, pdf en txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

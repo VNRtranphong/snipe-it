@@ -122,7 +122,8 @@
         @endcan
 
         @can('update', \App\Models\User::class)
-          <li class="pull-right"><a href="#" data-toggle="modal" data-target="#uploadFileModal">
+          <li class="pull-right">
+              <a href="#" data-toggle="modal" data-target="#uploadFileModal">
               <span class="hidden-xs"><i class="fas fa-paperclip" aria-hidden="true"></i></span>
               <span class="hidden-lg hidden-md hidden-xl"><i class="fas fa-paperclip fa-2x" aria-hidden="true"></i></span>
               <span class="hidden-xs hidden-sm">{{ trans('button.upload') }}</span>
@@ -179,17 +180,23 @@
 
                 @can('view', $user)
                 <div class="col-md-12" style="padding-top: 5px;">
+                @if($user->allAssignedCount() != '0') 
                   <a href="{{ route('users.print', $user->id) }}" style="width: 100%;" class="btn btn-sm btn-primary hidden-print" target="_blank" rel="noopener">{{ trans('admin/users/general.print_assigned') }}</a>
+                  @else
+                  <button style="width: 100%;" class="btn btn-sm btn-primary hidden-print" rel="noopener" disabled title="{{ trans('admin/users/message.user_has_no_assets_assigned') }}">{{ trans('admin/users/general.print_assigned') }}</button>
+                @endif
                 </div>
                 @endcan
 
                 @can('view', $user)
                   <div class="col-md-12" style="padding-top: 5px;">
-                  @if(!empty($user->email))
+                  @if(!empty($user->email) && ($user->allAssignedCount() != '0'))
                     <form action="{{ route('users.email',['userId'=> $user->id]) }}" method="POST">
                       {{ csrf_field() }}
                       <button style="width: 100%;" class="btn btn-sm btn-primary hidden-print" rel="noopener">{{ trans('admin/users/general.email_assigned') }}</button>
                     </form>
+                  @elseif(!empty($user->email) && ($user->allAssignedCount() == '0'))
+                      <button style="width: 100%;" class="btn btn-sm btn-primary hidden-print" rel="noopener" disabled title="{{ trans('admin/users/message.user_has_no_assets_assigned') }}">{{ trans('admin/users/general.email_assigned') }}</button>
                   @else
                       <button style="width: 100%;" class="btn btn-sm btn-primary hidden-print" rel="noopener" disabled title="{{ trans('admin/users/message.user_has_no_email') }}">{{ trans('admin/users/general.email_assigned') }}</button>
                   @endif
@@ -197,13 +204,17 @@
                 @endcan
 
                 @can('update', $user)
-                  @if (($user->activated == '1') && ($user->email != '') && ($user->ldap_import == '0'))
-                      <div class="col-md-12" style="padding-top: 5px;">
-                        <form action="{{ route('users.password',['userId'=> $user->id]) }}" method="POST">
+                  @if (($user->activated == '1') && ($user->ldap_import == '0'))
+                  <div class="col-md-12" style="padding-top: 5px;">
+                    @if($user->email != '')
+                      <form action="{{ route('users.password',['userId'=> $user->id]) }}" method="POST">
                           {{ csrf_field() }}
-                          <button style="width: 100%;" class="btn btn-sm btn-primary hidden-print">{{ trans('button.send_password_link') }}</button>
-                        </form>
-                      </div>
+                      <button style="width: 100%;" class="btn btn-sm btn-primary hidden-print">{{ trans('button.send_password_link') }}</button>
+                      </form>
+                    @else
+                      <button style="width: 100%;" class="btn btn-sm btn-primary hidden-print" rel="noopener" disabled title="{{ trans('admin/users/message.user_has_no_email') }}">{{ trans('button.send_password_link') }}</button> 
+                    @endif
+                  </div>
                   @endif
                 @endcan
 
@@ -509,13 +520,23 @@
                     </div>
                     @endif
 
-                     <!-- login enabled -->
+                    <!-- vip -->
+                    <div class="row">
+                      <div class="col-md-3">
+                        {{ trans('admin/users/general.vip_label') }}
+                      </div>
+                      <div class="col-md-9">
+                        {!! ($user->vip=='1') ? '<i class="fas fa-check fa-fw fa-fw text-success" aria-hidden="true"></i> '.trans('general.yes') : '<i class="fas fa-times fa-fw text-danger" aria-hidden="true"></i> '.trans('general.no')  !!}
+                      </div>
+                    </div> 
+                    
+                    <!-- remote -->
                      <div class="row">
                       <div class="col-md-3">
                         {{ trans('admin/users/general.remote') }}
                       </div>
                       <div class="col-md-9">
-                        {!! ($user->remote=='1') ? '<i class="fas fa-check text-success" aria-hidden="true"></i> '.trans('general.yes') : '<i class="fas fa-times text-danger" aria-hidden="true"></i> '.trans('general.no')  !!}
+                        {!! ($user->remote=='1') ? '<i class="fas fa-check fa-fw text-success" aria-hidden="true"></i> '.trans('general.yes') : '<i class="fas fa-times fa-fw text-danger" aria-hidden="true"></i> '.trans('general.no')  !!}
                       </div>
                     </div>
 
@@ -525,17 +546,28 @@
                         {{ trans('general.login_enabled') }}
                       </div>
                       <div class="col-md-9">
-                        {!! ($user->activated=='1') ? '<i class="fas fa-check text-success" aria-hidden="true"></i> '.trans('general.yes') : '<i class="fas fa-times text-danger" aria-hidden="true"></i> '.trans('general.no')  !!}
+                        {!! ($user->activated=='1') ? '<i class="fas fa-check fa-fw text-success" aria-hidden="true"></i> '.trans('general.yes') : '<i class="fas fa-times fa-fw text-danger" aria-hidden="true"></i> '.trans('general.no')  !!}
                       </div>
                     </div>
 
-                    <!-- LDAP -->
+                   <!-- auto assign license -->
+                   <div class="row">
+                       <div class="col-md-3">
+                           {{ trans('general.autoassign_licenses') }}
+                       </div>
+                       <div class="col-md-9">
+                           {!! ($user->autoassign_licenses=='1') ? '<i class="fas fa-check fa-fw text-success" aria-hidden="true"></i> '.trans('general.yes') : '<i class="fas fa-times fa-fw text-danger" aria-hidden="true"></i> '.trans('general.no')  !!}
+                       </div>
+                   </div>
+
+
+                   <!-- LDAP -->
                     <div class="row">
                       <div class="col-md-3">
                           LDAP
                       </div>
                       <div class="col-md-9">
-                        {!! ($user->ldap_import=='1') ? '<i class="fas fa-check text-success" aria-hidden="true"></i> '.trans('general.yes') : '<i class="fas fa-times text-danger" aria-hidden="true"></i> '.trans('general.no')  !!}
+                        {!! ($user->ldap_import=='1') ? '<i class="fas fa-check fa-fw text-success" aria-hidden="true"></i> '.trans('general.yes') : '<i class="fas fa-times fa-fw text-danger" aria-hidden="true"></i> '.trans('general.no')  !!}
 
                       </div>
                     </div>
@@ -549,7 +581,7 @@
                             </div>
                             <div class="col-md-9">
                           
-                              {!! ($user->two_factor_active()) ? '<i class="fas fa-check text-success" aria-hidden="true"></i> '.trans('general.yes') : '<i class="fas fa-times text-danger" aria-hidden="true"></i> '.trans('general.no')  !!}
+                              {!! ($user->two_factor_active()) ? '<i class="fas fa-check fa-fw text-success" aria-hidden="true"></i> '.trans('general.yes') : '<i class="fas fa-times fa-fw text-danger" aria-hidden="true"></i> '.trans('general.no')  !!}
                           
                             </div>
                           </div>
@@ -560,7 +592,7 @@
                               {{ trans('admin/users/general.two_factor_enrolled') }}
                             </div>
                             <div class="col-md-9" id="two_factor_reset_toggle">
-                              {!! ($user->two_factor_active_and_enrolled()) ? '<i class="fas fa-check text-success" aria-hidden="true"></i> '.trans('general.yes') : '<i class="fas fa-times text-danger" aria-hidden="true"></i> '.trans('general.no')  !!}
+                              {!! ($user->two_factor_active_and_enrolled()) ? '<i class="fas fa-check fa-fw text-success" aria-hidden="true"></i> '.trans('general.yes') : '<i class="fas fa-times fa-fw text-danger" aria-hidden="true"></i> '.trans('general.no')  !!}
 
                             </div>
                           </div>
@@ -570,11 +602,11 @@
                             <!-- 2FA reset -->
                             <div class="row">
                               <div class="col-md-3">
-                          
+
                               </div>
-                              <div class="col-md-9" style="margin-top: 10px;">
+                              <div class="col-md-9">
                                 
-                                <a class="btn btn-default btn-sm pull-left" id="two_factor_reset" style="margin-right: 10px;"> 
+                                <a class="btn btn-default btn-sm" id="two_factor_reset" style="margin-right: 10px; margin-top: 10px;">
                                   {{ trans('admin/settings/general.two_factor_reset') }}
                                 </a>
                                 <span id="two_factor_reseticon">
@@ -740,18 +772,20 @@
                     }'>
               <thead>
                 <tr>
-                  <th class="col-md-5">{{ trans('general.name') }}</th>
-                  <th class="col-md-6" data-footer-formatter="sumFormatter" data-fieldname="purchase_cost">{{ trans('general.purchase_cost') }}</th>
-                  <th class="col-md-1 hidden-print">{{ trans('general.action') }}</th>
+                    <th class="col-md-5">{{ trans('general.name') }}</th>
+                    <th class-="col-md-5" data-fieldname="note">{{ trans('general.notes') }}</th>
+                    <th class="col-md-1" data-footer-formatter="sumFormatter" data-fieldname="purchase_cost">{{ trans('general.purchase_cost') }}</th>
+                    <th class="col-md-1 hidden-print">{{ trans('general.action') }}</th>
                 </tr>
               </thead>
               <tbody>
                   @foreach ($user->accessories as $accessory)
                   <tr>
                     <td>{!!$accessory->present()->nameUrl()!!}</td>
-                    <td>
+                      <td>{!! $accessory->pivot->note !!}</td>
+                      <td>
                       {!! Helper::formatCurrencyOutput($accessory->purchase_cost) !!}
-                    </td>
+                      </td>
                     <td class="hidden-print">
                       @can('checkin', $accessory)
                         <a href="{{ route('accessories.checkin.show', array('accessoryID'=> $accessory->pivot->id, 'backto'=>'user')) }}" class="btn btn-primary btn-sm hidden-print">{{ trans('general.checkin') }}</a>
@@ -856,17 +890,22 @@
 
                             </td>
                             <td>
-                                @if ($file->filename)
-                                    @if ( Helper::checkUploadIsImage($file->get_src('users')))
+                                @if (($file->filename) && (Storage::exists('private_uploads/users/'.$file->filename)))
+                                   @if (Helper::checkUploadIsImage($file->get_src('users')))
                                         <a href="{{ route('show/userfile', ['userId' => $user->id, 'fileId' => $file->id, 'download' => 'false']) }}" data-toggle="lightbox" data-type="image"><img src="{{ route('show/userfile', ['userId' => $user->id, 'fileId' => $file->id]) }}" class="img-thumbnail" style="max-width: 50px;"></a>
+                                    @else
+                                        {{ trans('general.preview_not_available') }}
                                     @endif
+                                @else
+                                    <i class="fa fa-times text-danger" aria-hidden="true"></i>
+                                        {{ trans('general.file_not_found') }}
                                 @endif
                             </td>
                             <td>
                                 {{ $file->filename }}
                             </td>
-                            <td>
-                                {{ Helper::formatFilesizeUnits(Storage::size('private_uploads/users/'.$file->filename)) }}
+                            <td data-value="{{ (Storage::exists('private_uploads/users/'.$file->filename)) ? Storage::size('private_uploads/users/'.$file->filename) : '' }}">
+                                {{ (Storage::exists('private_uploads/users/'.$file->filename)) ? Helper::formatFilesizeUnits(Storage::size('private_uploads/users/'.$file->filename)) : '' }}
                             </td>
 
                             <td>
@@ -876,10 +915,12 @@
                             </td>
                             <td>
                                 @if ($file->filename)
-                                    <a href="{{ route('show/userfile', [$user->id, $file->id]) }}" class="btn btn-default">
-                                        <i class="fas fa-download" aria-hidden="true"></i>
-                                        <span class="sr-only">{{ trans('general.download') }}</span>
-                                    </a>
+                                    @if (Storage::exists('private_uploads/users/'.$file->filename))
+                                        <a href="{{ route('show/userfile', [$user->id, $file->id]) }}" class="btn btn-default">
+                                            <i class="fas fa-download" aria-hidden="true"></i>
+                                            <span class="sr-only">{{ trans('general.download') }}</span>
+                                        </a>
+                                    @endif
                                 @endif
                             </td>
                             <td>{{ $file->created_at }}</td>
@@ -929,15 +970,18 @@
               <thead>
               <tr>
                 <th data-field="icon" style="width: 40px;" class="hidden-xs" data-formatter="iconFormatter">Icon</th>
-                <th class="col-sm-3" data-field="created_at" data-formatter="dateDisplayFormatter" data-sortable="true">{{ trans('general.date') }}</th>
-                <th class="col-sm-2" data-field="admin" data-formatter="usersLinkObjFormatter">{{ trans('general.admin') }}</th>
-                <th class="col-sm-2" data-field="action_type">{{ trans('general.action') }}</th>
+                <th data-field="created_at" data-formatter="dateDisplayFormatter" data-sortable="true">{{ trans('general.date') }}</th>
+                  <th data-field="item" data-formatter="polymorphicItemFormatter">{{ trans('general.item') }}</th>
+                  <th data-field="action_type">{{ trans('general.action') }}</th>
+                  <th data-field="target" data-formatter="polymorphicItemFormatter">{{ trans('general.target') }}</th>
+                  <th data-field="note">{{ trans('general.notes') }}</th>
                   @if  ($snipeSettings->require_accept_signature=='1')
-                      <th class="col-md-3" data-field="signature_file" data-visible="false"  data-formatter="imageFormatter">{{ trans('general.signature') }}</th>
+                      <th data-field="signature_file" data-visible="false"  data-formatter="imageFormatter">{{ trans('general.signature') }}</th>
                   @endif
-                  <th class="col-sm-3" data-field="item.serial" data-visible="false">{{ trans('admin/hardware/table.serial') }}</th>
-                  <th class="col-sm-3" data-field="item" data-formatter="polymorphicItemFormatter">{{ trans('general.item') }}</th>
-                <th class="col-sm-2" data-field="target" data-formatter="polymorphicItemFormatter">{{ trans('general.target') }}</th>
+                  <th data-field="item.serial" data-visible="false">{{ trans('admin/hardware/table.serial') }}</th>
+                  <th data-field="admin" data-formatter="usersLinkObjFormatter">{{ trans('general.admin') }}</th>
+
+
               </tr>
               </thead>
             </table>
@@ -999,9 +1043,9 @@ $(function () {
       dataType: 'json',
 
       success: function (data) {
-        $("#two_factor_reset_toggle").html('').html('<i class="fas fa-times text-danger" aria-hidden="true"></i> {{ trans('general.no') }}');
+        $("#two_factor_reset_toggle").html('').html('<span class="text-danger"><i class="fas fa-times" aria-hidden="true"></i> {{ trans('general.no') }}</span>');
         $("#two_factor_reseticon").html('');
-        $("#two_factor_resetstatus").html('<i class="fas fa-check text-success"></i>' + data.message);
+        $("#two_factor_resetstatus").html('<span class="text-success"><i class="fas fa-check"></i> ' + data.message + '</span>');
 
       },
 

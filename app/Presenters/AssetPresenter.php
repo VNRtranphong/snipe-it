@@ -141,6 +141,12 @@ class AssetPresenter extends Presenter
                 'title' => trans('general.purchase_date'),
                 'formatter' => 'dateDisplayFormatter',
             ], [
+                'field' => 'age',
+                'searchable' => true,
+                'sortable' => true,
+                'visible' => false,
+                'title' => trans('general.age'),
+            ], [
                 'field' => 'purchase_cost',
                 'searchable' => true,
                 'sortable' => true,
@@ -157,9 +163,16 @@ class AssetPresenter extends Presenter
             ], [
                 'field' => 'eol',
                 'searchable' => false,
-                'sortable' => false,
+                'sortable' => true,
                 'visible' => false,
                 'title' => trans('general.eol'),
+            ],
+            [
+                'field' => 'asset_eol_date',
+                'searchable' => true,
+                'sortable' => true,
+                'visible' => false,
+                'title' => trans('admin/hardware/form.eol_date'),
                 'formatter' => 'dateDisplayFormatter',
             ], [
                 'field' => 'warranty_months',
@@ -244,6 +257,14 @@ class AssetPresenter extends Presenter
                 'visible' => false,
                 'title' => trans('general.next_audit_date'),
                 'formatter' => 'dateDisplayFormatter',
+            ], [
+                'field' => 'byod',
+                'searchable' => false,
+                'sortable' => true,
+                'visible' => false,
+                'title' => trans('general.byod'),
+                'formatter' => 'trueFalseFormatter',
+
             ],
         ];
 
@@ -511,6 +532,18 @@ class AssetPresenter extends Presenter
         }
 
         return false;
+    }
+
+    /**
+     * Used to take user created warranty URL and dynamically fill in the needed values per asset
+     * @return string
+     */
+    public function dynamicWarrantyUrl()
+    {
+        $warranty_lookup_url = $this->model->model->manufacturer->warranty_lookup_url;
+        $url = (str_replace('{LOCALE}',\App\Models\Setting::getSettings()->locale,$warranty_lookup_url));
+        $url = (str_replace('{SERIAL}',$this->model->serial,$url));
+        return $url;
     }
 
     /**

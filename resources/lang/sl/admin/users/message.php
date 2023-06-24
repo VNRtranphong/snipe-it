@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'To sredstev ste uspešno zavrnili.',
     'bulk_manager_warn'	        => 'Vaši uporabniki so bili uspešno posodobljeni, vendar vnos v upravitelju ni bil shranjen, ker je bil izbran upravitelj tudi na seznamu uporabnikov, ki ga je treba urediti, uporabniki pa morda niso njihovi lastniki. Prosimo, izberite svoje uporabnike, razen upravitelja.',
     'user_exists'               => 'Uporabnik že obstaja!',
-    'user_not_found'            => 'Uporabnik [: id] ne obstaja.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Polje za prijavo je obvezno',
     'user_password_required'    => 'Geslo je obvezno.',
     'insufficient_permissions'  => 'Nezadostna dovoljenja.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'Izbranim aktiviranim uporabnikom z veljavnim e-poštnim računom je bila poslana povezava za ponastavitev gesla.',
     'password_reset_sent'       => 'Povezava za ponastavitev gesla je bila poslana na :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Ena ali več vaših datotek je prevelika ali pa je tip datoteke, ki ni dovoljen. Dovoljeni tipi datotek so png, gif, jpg, doc, docx, pdf in txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

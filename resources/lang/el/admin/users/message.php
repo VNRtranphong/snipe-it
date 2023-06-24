@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Έχετε απορρίψει επιτυχώς αυτό το στοιχείο.',
     'bulk_manager_warn'	        => 'Οι χρήστες σας ενημερώθηκαν με επιτυχία, ωστόσο η καταχώριση του διαχειριστή σας δεν αποθηκεύτηκε, επειδή ο διαχειριστής που επιλέξατε ήταν επίσης στη λίστα χρηστών για επεξεργασία και οι χρήστες ενδέχεται να μην είναι ο δικός τους διαχειριστής. Επιλέξτε ξανά τους χρήστες σας, εξαιρουμένου του διαχειριστή.',
     'user_exists'               => 'Ο χρήστης υπάρχει ήδη!',
-    'user_not_found'            => 'Ο χρήστης [:id] δεν υπάρχει.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Το πεδίο εισόδου είναι υποχρεωτικό',
     'user_password_required'    => 'Ο κωδικός είναι απαραίτητος.',
     'insufficient_permissions'  => 'Δεν έχετε επαρκή δικαιώματα.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'The selected users who are activated and have a valid email addresses have been sent a password reset link.',
     'password_reset_sent'       => 'A password reset link has been sent to :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Ένα ή περισσότερα από τα αρχεία σας είναι πολύ μεγάλα ή είναι τύπου αρχείου που δεν επιτρέπεται. Τα επιτρεπόμενα αρχεία τύπου png, gif, jpg, doc, docx, pdf και txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

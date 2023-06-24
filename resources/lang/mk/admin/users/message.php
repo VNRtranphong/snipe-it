@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Го одбивте основното средство.',
     'bulk_manager_warn'	        => 'Вашите корисници се ажурирани, но записот за менаџерот не е зачуван, бидејќи менаџерот што го избравте беше во листата на корисници што се ажурираа. Корисниците не може да бидат свој сопствен менаџер. Изберете ги корисниците повторно, со исклучок на менаџерот и пробајте пак.',
     'user_exists'               => 'Корисникот веќе постои!',
-    'user_not_found'            => 'Корисникот [:id] не постои.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Полето за корисничко име е задолжително',
     'user_password_required'    => 'Потребна е лозинка.',
     'insufficient_permissions'  => 'Недоволни дозволи.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'The selected users who are activated and have a valid email addresses have been sent a password reset link.',
     'password_reset_sent'       => 'A password reset link has been sent to :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Една или повеќе од вашите датотеки е преголема или е тип на датотека што не е дозволен. Дозволени типови на датотеки се png, gif, jpg, doc, docx, pdf и txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

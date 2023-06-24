@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Bạn đã từ chối tài sản này thành công.',
     'bulk_manager_warn'	        => 'Người dùng của bạn đã được cập nhật thành công, tuy nhiên mục nhập của người quản lý của bạn không được lưu bởi vì người quản lý bạn đã chọn cũng nằm trong danh sách người dùng cần chỉnh sửa, và người dùng không phải là người quản lý của họ. Vui lòng chọn người dùng của bạn một lần nữa, ngoại trừ người quản lý.',
     'user_exists'               => 'Người dùng thật sự tồn tại!',
-    'user_not_found'            => 'Người dùng [:id] không tồn tại.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Trường đăng nhập thì bắt buộc',
     'user_password_required'    => 'Mật khẩu thì bắt buộc.',
     'insufficient_permissions'  => 'Không có đủ quyền.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'Những người dùng với trạng thái kích hoạt đã chọn và có địa chỉ email hợp lệ sẽ nhận được liên kết đặt lại mật khẩu.',
     'password_reset_sent'       => 'Đường đẫn khôi phục mật khẩu được gửi đến :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Một hoặc nhiều tập tin của bạn có dung lượng quá lớn hoặc loại tập tin không cho phép tải lên. Chỉ cho phép những loại tập tin png, gif, jpg, doc, docx, pdf, and txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

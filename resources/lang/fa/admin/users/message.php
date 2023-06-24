@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'شما با موفقیت این دارایی را به کاهش دادید.',
     'bulk_manager_warn'	        => 'کاربران شما با موفقیت به روز شده اند، با این حال مدیر ورود شما ذخیره نشد زیرا مدیر شما انتخاب شده بود نیز در لیست کاربر برای ویرایش، و کاربران ممکن است مدیر خود نیست. لطفا کاربران خود را دوباره انتخاب کنید، به غیر از مدیر.',
     'user_exists'               => 'کاربر "{0}" در حال حاضر وجود دارد.',
-    'user_not_found'            => 'کاربر [:id] موجود نیست.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'فیلد ورود الزامی است.',
     'user_password_required'    => 'کلمه عبور ضروری است.',
     'insufficient_permissions'  => 'دسترسی محدود',
@@ -18,6 +18,7 @@ return array(
 ',
     'user_has_no_email'         => 'این کاربر آدرس ایمیلی در نمایه خود ندارد.
 ',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -62,4 +63,8 @@ return array(
         'invalidfiles' => 'یک یا چندی از فایل های شما با پسوند غیرمجاز هستند.پسوند های مجاز شامل:png, gif, jpg, doc, docx, pdf و text می باشند.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

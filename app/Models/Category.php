@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Gate;
 use Watson\Validating\ValidatingTrait;
 use App\Helpers\Helper;
+use Illuminate\Support\Str;
 
 /**
  * Model for Categories. Categories are a higher-level group
@@ -97,6 +98,7 @@ class Category extends SnipeModel
      */
     public function isDeletable()
     {
+
         return Gate::allows('delete', $this)
                 && ($this->itemCount() == 0);
     }
@@ -150,7 +152,10 @@ class Category extends SnipeModel
     }
 
     /**
-     * Get the number of items in the category
+     * Get the number of items in the category. This should NEVER be used in
+     * a collection of categories, as you'll end up with an n+1 query problem.
+     *
+     * It should only be used in a single category context.
      *
      * @author [A. Gianotto] [<snipe@snipe.net>]
      * @since [v2.0]
@@ -158,6 +163,11 @@ class Category extends SnipeModel
      */
     public function itemCount()
     {
+
+        if (isset($this->{Str::plural($this->category_type).'_count'})) {
+            return $this->{Str::plural($this->category_type).'_count'};
+        }
+
         switch ($this->category_type) {
             case 'asset':
                 return $this->assets()->count();
@@ -169,9 +179,10 @@ class Category extends SnipeModel
                 return $this->consumables()->count();
             case 'license':
                 return $this->licenses()->count();
+            default:
+                return 0;
         }
 
-        return '0';
     }
 
     /**
@@ -183,7 +194,25 @@ class Category extends SnipeModel
      */
     public function assets()
     {
-        return $this->hasManyThrough(\App\Models\Asset::class, \App\Models\AssetModel::class, 'category_id', 'model_id');
+        return $this->hasManyThrough(Asset::class, \App\Models\AssetModel::class, 'category_id', 'model_id');
+    }
+
+    /**
+     * Establishes the category -> assets relationship but also takes into consideration
+     * the setting to show archived in lists.
+     *
+     * We could have complicated the assets() method above, but keeping this separate
+     * should give us more flexibility if we need to return actually archived assets
+     * by their category.
+     *
+     * @author [A. Gianotto] [<snipe@snipe.net>]
+     * @since [v6.1.0]
+     * @see \App\Models\Asset::scopeAssetsForShow()
+     * @return \Illuminate\Database\Eloquent\Relations\Relation
+     */
+    public function showableAssets()
+    {
+        return $this->hasManyThrough(Asset::class, \App\Models\AssetModel::class, 'category_id', 'model_id')->AssetsForShow();
     }
 
     /**

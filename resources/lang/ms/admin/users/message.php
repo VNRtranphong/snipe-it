@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Anda telah berjaya menolak aset ini.',
     'bulk_manager_warn'	        => 'Pengguna anda telah berjaya dikemas kini, namun entri pengurus anda tidak disimpan kerana pengurus yang anda pilih juga dalam senarai pengguna untuk diedit, dan pengguna mungkin bukan pengurus mereka sendiri. Sila pilih pengguna anda sekali lagi, tidak termasuk pengurus.',
     'user_exists'               => 'Pengguna telah wujud!',
-    'user_not_found'            => 'Pengguna [:id] tidak wujud.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Ruangan log masuk diperlukan',
     'user_password_required'    => 'Ruangan kata kunci diperlukan.',
     'insufficient_permissions'  => 'Tidak cukup kuasa.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'The selected users who are activated and have a valid email addresses have been sent a password reset link.',
     'password_reset_sent'       => 'A password reset link has been sent to :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Satu atau lebih daripada fail anda terlalu besar atau merupakan filetype yang tidak dibenarkan. Filetype yang dibenarkan adalah png, gif, jpg, doc, docx, pdf, dan txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

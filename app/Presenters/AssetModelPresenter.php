@@ -88,7 +88,7 @@ class AssetModelPresenter extends Presenter
                 'sortable' => true,
                 'switchable' => true,
                 'title' => trans('general.category'),
-                'visible' => false,
+                'visible' => true,
                 'formatter' => 'categoriesLinkObjFormatter',
             ],
             [
@@ -210,7 +210,7 @@ class AssetModelPresenter extends Presenter
     public function imageUrl()
     {
         if (! empty($this->image)) {
-            return '<img src="'.url('/').'/uploads/models/'.$this->image.'" alt="'.$this->name.'" height="50" width="50">';
+            return '<img src="'.config('app.url').'/uploads/models/'.$this->image.'" alt="'.$this->name.'" height="50" width="50">';
         }
 
         return '';
@@ -223,7 +223,7 @@ class AssetModelPresenter extends Presenter
     public function imageSrc()
     {
         if (! empty($this->image)) {
-            return url('/').'/uploads/models/'.$this->image;
+            return config('app.url').'/uploads/models/'.$this->image;
         }
 
         return '';

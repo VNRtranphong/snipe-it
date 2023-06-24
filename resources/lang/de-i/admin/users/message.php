@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Du hast diesen Gegenstand erfolgreich abgelehnt.',
     'bulk_manager_warn'	        => 'Deine Benutzer wurden erfolgreich aktualisiert, aber Dein Manager-Eintrag wurde nicht gespeichert, da der Manager, den Du ausgewählt hast, auch in der zu bearbeitenden Liste war, und Benutzer dürfen nicht ihr eigener Manager sein. Bitte wähle Deine Benutzer erneut aus, ohne den Manager.',
     'user_exists'               => 'Benutzer existiert bereits!',
-    'user_not_found'            => 'Benutzer [:id] existiert nicht.',
+    'user_not_found'            => 'Benutzer existiert nicht.',
     'user_login_required'       => 'Das Loginfeld ist erforderlich',
     'user_password_required'    => 'Das Passswortfeld ist erforderlich.',
     'insufficient_permissions'  => 'Unzureichende Berechtigungen.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'Den ausgewählten Benutzern, die aktiviert sind und eine gültige E-Mail-Adresse haben, wurde ein Link zum Zurücksetzen des Passworts gesendet.',
     'password_reset_sent'       => 'Der Link zum Zurücksetzen des Passworts wurde an :email gesendet!',
     'user_has_no_email'         => 'Dieser Benutzer hat keine E-Mail-Adresse in seinem Profil.',
+    'user_has_no_assets_assigned'   => 'Dieser Benutzer hat keine zugewiesenen Assets',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Eine oder mehrere Deiner Dateien sind zu groß, oder deren Dateityp ist nicht zugelassen. Zugelassene Dateitypen sind png, gif, jpg, doc, docx, pdf, und txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'Für diesen Benutzer ist keine E-Mail-Adresse hinterlegt.',
+        'success' => 'Der Benutzer wurde über sein aktuelles Inventar informiert.'
+    )
 );

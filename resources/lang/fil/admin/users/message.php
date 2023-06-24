@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Matagumpay mong hindi tinaggap ang asset na ito.',
     'bulk_manager_warn'	        => 'Ang iyong mga user ay matagumpay nang nai-update, subalit ang iyong manager entry ay hindi nai-save dahil ang manager na iyong pinili ay kabilang sa listahan ng user na kailangang i-edit, at ang mga user ay maaaring wala sa sarili nilang pamamahala. Mangyaring pumiling muli ng iyong user, hindi kasama ang manager.',
     'user_exists'               => 'Ang user ay umiiral na!',
-    'user_not_found'            => 'Ang User [:id] hindi umiiral.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Ang field ng login ay kinakailangan',
     'user_password_required'    => 'Ang password ay kinakailangan.',
     'insufficient_permissions'  => 'Hindi sapat na mga pahintulot.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'The selected users who are activated and have a valid email addresses have been sent a password reset link.',
     'password_reset_sent'       => 'A password reset link has been sent to :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -60,4 +61,8 @@ return array(
         'invalidfiles' => 'Ang isa o higit sa iyong mga file ay masyadong malaki o isang uri ng file na hindi pinapayagan. Ang mga pinapayagang mga file ay ang png, gif, jpg, doc, docx, pdf, at txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

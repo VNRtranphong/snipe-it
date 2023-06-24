@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Hai rifiutato con successo questo prodotto.',
     'bulk_manager_warn'	        => 'I tuoi utenti sono stati aggiornati con successo, tuttavia la voce del gestore non è stata salvata perché il gestore selezionato è stato anche nell\'elenco utenti da modificare e gli utenti potrebbero non essere il proprio gestore. Seleziona nuovamente i tuoi utenti, esclusi il gestore.',
     'user_exists'               => 'Utente già esistente!',
-    'user_not_found'            => 'L\'utente [:id] non esite.',
+    'user_not_found'            => 'L\'utente non esiste.',
     'user_login_required'       => 'È necessario il campo login',
     'user_password_required'    => 'È richiesta la password.',
     'insufficient_permissions'  => 'Permessi Insufficienti.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'È stato inviato un link agli utenti selezionati che sono attivati e hanno un indirizzo email valido, per reimpostare la password.',
     'password_reset_sent'       => 'Un link per reimpostare la password è stato inviato a :email!',
     'user_has_no_email'         => 'Questo utente non ha un indirizzo email nel suo profilo.',
+    'user_has_no_assets_assigned'   => 'Questo utente non ha nessun bene assegnato',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Uno o più file è troppo grande o è un tipo di file non consentito. Tipi di file ammessi sono png, gif, jpg, doc, docx, pdf, txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'Questo utente non ha una email.',
+        'success' => 'L\'utente è stato informato del suo inventario corrente.'
+    )
 );

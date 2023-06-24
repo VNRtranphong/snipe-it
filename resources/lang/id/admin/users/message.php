@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'Anda sukses menolak aset ini.',
     'bulk_manager_warn'	        => 'Pengguna Anda telah berhasil diperbarui, namun entri pengelola Anda tidak disimpan karena manajer yang Anda pilih juga ada dalam daftar pengguna untuk diedit, dan pengguna mungkin bukan manajer mereka sendiri. Silakan pilih pengguna Anda lagi, tidak termasuk manajernya.',
     'user_exists'               => 'Pengguna sudah ada!',
-    'user_not_found'            => 'Pengguna [:id] tidak terdaftar.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'Kolom login wajib di-isi',
     'user_password_required'    => 'Kata sandi wajib di-isi.',
     'insufficient_permissions'  => 'Tidak ada hak akses.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'Pengguna terpilih yang diaktifkan dan memiliki alamat email yang valid telah dikirimi tautan pengaturan ulang kata sandi.',
     'password_reset_sent'       => 'Tautan reset kata sandi telah dikirim ke :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'Satu atau lebih dari file Anda terlalu besar atau jenis berkas yang tidak diperbolehkan. Tipe file diizinkan adalah png, gif, jpg, doc, docx, pdf, dan txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'இந்த சொத்து வெற்றிகரமாக நிராகரித்தது.',
     'bulk_manager_warn'	        => 'உங்கள் பயனர் வெற்றிகரமாக புதுப்பிக்கப்பட்டிருந்தாலும், உங்கள் மேலாளர் நுழைவு சேமிக்கப்படவில்லை, ஏனெனில் நீங்கள் தேர்ந்தெடுத்த மேலாளர் பயனர் பட்டியலில் திருத்தப்பட வேண்டும், மேலும் பயனர்கள் தங்கள் மேலாளராக இருக்கலாம். மேலாளரைத் தவிர்த்து உங்கள் பயனர்களை மீண்டும் தேர்ந்தெடுக்கவும்.',
     'user_exists'               => 'பயனர் ஏற்கனவே உள்ளது!',
-    'user_not_found'            => 'பயனர் [: id] இல்லை.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'உள்நுழைவுத் துறை தேவைப்படுகிறது',
     'user_password_required'    => 'கடவுச்சொல் தேவை.',
     'insufficient_permissions'  => 'போதிய அனுமதிகள் இல்லை.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'The selected users who are activated and have a valid email addresses have been sent a password reset link.',
     'password_reset_sent'       => 'A password reset link has been sent to :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'உங்கள் கோப்புகளில் ஒன்று அல்லது அதற்கு மேற்பட்டவை மிக அதிகமாக உள்ளது அல்லது அனுமதிக்கப்படாத கோப்பு வகை உள்ளது. அனுமதிக்கப்பட்ட கோப்புரிமைகள் png, gif, jpg, doc, docx, pdf மற்றும் txt ஆகியவை.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

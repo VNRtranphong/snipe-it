@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'คุณปฏิเสธสินทรัพย์นี้เรียบร้อยแล้ว',
     'bulk_manager_warn'	        => 'ผู้ใช้ของคุณได้รับการอัปเดตแล้วแม้ว่ารายการผู้จัดการจะไม่ได้รับการบันทึกเนื่องจากผู้จัดการที่คุณเลือกอยู่ในรายชื่อผู้ใช้ที่จะแก้ไขและผู้ใช้ต้องไม่เป็นผู้จัดการของตัวเอง โปรดเลือกผู้ใช้ของคุณอีกครั้งโดยไม่รวมผู้จัดการ',
     'user_exists'               => 'มีผู้ใช้งานนี้แล้ว',
-    'user_not_found'            => 'ไม่มีชื่อผู้ใช้งานนี้',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'ต้องการชื่อผู้ใช้งาน',
     'user_password_required'    => 'ต้องการรหัสผ่าน',
     'insufficient_permissions'  => 'สิทธิ์การใช้งานไม่เพียงพอ',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'The selected users who are activated and have a valid email addresses have been sent a password reset link.',
     'password_reset_sent'       => 'A password reset link has been sent to :email!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'ไฟล์ข้อมูลของคุณมีขนาดใหญ่เกินไป หรือประเภทของไฟล์ไม่ได้รับการอนุญาต ประเภทของไฟล์ที่ได้รับอนุญาตแล้วมีดังนี้ png, gif, jpg, doc, docx, pdf, and txt.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );

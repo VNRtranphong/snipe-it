@@ -6,7 +6,7 @@ return array(
     'declined'                  => 'لقد رفضت هذا الأصل بنجاح.',
     'bulk_manager_warn'	        => 'تم تحديث المستخدمين بنجاح، ولكن لم يتم حفظ إدخال مديرك لأن المدير الذي حددته كان أيضا في قائمة المستخدمين التي سيتم تعديلها، وقد لا يكون المستخدمون مديرهم الخاص. يرجى تحديد المستخدمين مرة أخرى، باستثناء المدير.',
     'user_exists'               => 'المستخدم موجود مسبقاً!',
-    'user_not_found'            => 'المستخدم :id غير موجود.',
+    'user_not_found'            => 'User does not exist.',
     'user_login_required'       => 'حقل تسجيل الدخول اجباري',
     'user_password_required'    => 'كلمة المرور اجبارية.',
     'insufficient_permissions'  => 'صلاحيات غير كافية.',
@@ -15,6 +15,7 @@ return array(
     'password_resets_sent'      => 'تم إرسال رابط إعادة تعيين كلمة المرور للمستخدمين المحددين الذين تم تفعيلهم ولديهم عناوين بريد إلكتروني صالحة.',
     'password_reset_sent'       => 'تم إرسال رابط إعادة تعيين كلمة المرور إلى البريد الإلكتروني!',
     'user_has_no_email'         => 'This user does not have an email address in their profile.',
+    'user_has_no_assets_assigned'   => 'This user does not have any assets assigned',
 
 
     'success' => array(
@@ -59,4 +60,8 @@ return array(
         'invalidfiles' => 'واحد أو أكثر من الملفات كبير جدا أو هو نوع ملف غير مسموح به. أنواع الملفات المسموح بها هي ينغ و جيف و جبغ و دوك و دوك و بدف و تكست.',
     ),
 
+    'inventorynotification' => array(
+        'error'   => 'This user has no email set.',
+        'success' => 'The user has been notified about their current inventory.'
+    )
 );
