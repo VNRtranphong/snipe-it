@@ -87,8 +87,8 @@ echo "- run migrations to get your schema up to date \n";
 echo "- clear out old cache settings\e[39m\n\n";
 
 
-// Fetching most current upgrade requirements from github. Read more here: https://github.com/grokability/snipe-it/pull/14127
-$remote_requirements_file = "https://raw.githubusercontent.com/grokability/snipe-it/$branch/.upgrade_requirements.json";
+// Fetching most current upgrade requirements from github. Read more here: https://github.com/vnrtranphong/snipe-it/pull/14127
+$remote_requirements_file = "https://raw.githubusercontent.com/vnrtranphong/snipe-it/$branch/.upgrade_requirements.json";
 $upgrade_requirements_raw = url_get_contents($remote_requirements_file);
 $upgrade_requirements = json_decode($upgrade_requirements_raw, true);
 if (! $upgrade_requirements) {
@@ -463,7 +463,7 @@ if ((strpos('git version', $git_version)) === false) {
         @list($url, $purpose) = explode(" ", $remote_bits[1]);
         if (in_array($url, ['git@github.com:snipe/snipe-it.git', 'https://github.com/snipe/snipe-it.git'])) {
             // SSH or HTTPS remotes
-            $new_url = preg_replace("|snipe/snipe-it|", "grokability/snipe-it", $url);
+            $new_url = preg_replace("|snipe/snipe-it|", "vnrtranphong/snipe-it", $url);
             echo $success_icon . " Resetting remote " . $remote_bits[0] . " at $url to $new_url for purpose: $purpose\n";
             $push = '';
             if ($purpose == '(push)') {
