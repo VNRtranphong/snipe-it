@@ -6,7 +6,7 @@ return [
     'title' => 'Title',
     'start_date' => 'Start Date',
     'completion_date' => 'Completion Date',
-    'cost' => 'Cost',
+    'cost' => 'Giá tiền không VAT',
     'is_warranty' => 'Warranty Improvement',
     'asset_maintenance_time' => 'Asset Maintenance Time (in days)',
     'notes' => 'Notes',
