@@ -27,6 +27,7 @@
                     :$item
                     name="name"
                     required
+					placeholder="Nhập tên sự cố, hoặc  Bảo trì nếu là bảo trì định kỳ"
                 />
 
                 @if (! $item->id)
@@ -91,7 +92,7 @@
                     input_div_class="col-md-4"
                 />
 
-
+{{--
                 <x-form.row
                     :label="trans('admin/maintenances/form.completion_date')"
                     name="expected_completion_date"
@@ -100,7 +101,7 @@
                     input_div_class="col-md-4"
                     :default_now="false"
                 />
-
+ --}}
                 {{-- Editable actual-completion date. Available on create as
                      well as edit so users can backfill historical
                      maintenances that were already done before being
@@ -144,23 +145,22 @@
                 />
 
                 <x-form.row
-                    :label="trans('general.url')"
+                    :label="trans('general.notes')"
                     :$item
                     name="url"
-                    type="url"
-                    input_icon="link"
-                    input_group_addon="left"
-                    placeholder="https://example.com"
+                    type="textarea"
+                    placeholder="Nhập mô tả sự cố"
                 />
 
                 <x-input.image-upload :item="$item" :imagePath="app('maintenances_path')"/>
                 <x-input.file-upload inputId="maintenanceFileUpload"/>
 
                 <x-form.row
-                    :label="trans('admin/maintenances/form.notes')"
+                    :label="trans('general.huy')"
                     :$item
                     name="notes"
-                    type="textarea"
+                    type="number"
+					placeholder="Nhập Số Suất Hủy"
                 />
 
             </x-box>

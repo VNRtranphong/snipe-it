@@ -65,7 +65,7 @@ class Maintenance extends SnipeModel implements CompanyableChild
         'expected_completion_date' => 'date|nullable|after_or_equal:start_date',
         'notes' => 'string|nullable',
         'cost' => 'numeric|nullable|gte:0|max:99999999999999999.99',
-        'url' => 'nullable|url|max:255',
+        'url' => 'nullable|string',
         'responsible_party_id' => 'nullable|integer|exists:users,id',
         'completed_by' => 'nullable|integer|exists:users,id',
         'completed_at' => 'nullable|date|after_or_equal:start_date|before_or_equal:now',
