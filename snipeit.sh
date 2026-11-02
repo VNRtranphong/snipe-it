@@ -299,6 +299,42 @@ set_firewall () {
   fi
 }
 
+configure_php_upload_limit () {
+  echo "* Configuring PHP upload limits (200MB max)."
+  
+  # Tìm file php.ini đang hoạt động của hệ thống
+  PHP_INI_PATH=$(php -i 2>/dev/null | grep "Loaded Configuration File" | awk '{print $NF}')
+
+  if [ -z "$PHP_INI_PATH" ] || [ "$PHP_INI_PATH" == "(none)" ]; then
+    # Tìm kiếm tự động các đường dẫn php.ini phổ biến nếu php-cli không trả về đúng
+    PHP_INI_PATH=$(find /etc/php /etc/php.ini /etc/php*.ini -name "php.ini" 2>/dev/null | head -n 1)
+  fi
+
+  if [ -f "$PHP_INI_PATH" ]; then
+    echo "  * Found php.ini at: $PHP_INI_PATH"
+    
+    # Cập nhật các thông số upload, post size và memory limit
+    sed -i -E 's/^[[:space:]]*upload_max_filesize[[:space:]]*=.*/upload_max_filesize = 200M/' "$PHP_INI_PATH"
+    sed -i -E 's/^[[:space:]]*post_max_size[[:space:]]*=.*/post_max_size = 205M/' "$PHP_INI_PATH"
+    sed -i -E 's/^[[:space:]]*memory_limit[[:space:]]*=.*/memory_limit = 256M/' "$PHP_INI_PATH"
+    sed -i -E 's/^[[:space:]]*max_execution_time[[:space:]]*=.*/max_execution_time = 300/' "$PHP_INI_PATH"
+    sed -i -E 's/^[[:space:]]*max_input_time[[:space:]]*=.*/max_input_time = 300/' "$PHP_INI_PATH"
+
+    # Nếu hệ thống có dùng PHP-FPM (như CentOS/RedHat 9, 10), điều chỉnh thêm php.ini của FPM
+    FPM_INI=$(find /etc/php* -path "*/fpm/php.ini" 2>/dev/null | head -n 1)
+    if [ -f "$FPM_INI" ] && [ "$FPM_INI" != "$PHP_INI_PATH" ]; then
+      echo "  * Updating PHP-FPM config at: $FPM_INI"
+      sed -i -E 's/^[[:space:]]*upload_max_filesize[[:space:]]*=.*/upload_max_filesize = 200M/' "$FPM_INI"
+      sed -i -E 's/^[[:space:]]*post_max_size[[:space:]]*=.*/post_max_size = 205M/' "$FPM_INI"
+      sed -i -E 's/^[[:space:]]*memory_limit[[:space:]]*=.*/memory_limit = 256M/' "$FPM_INI"
+      sed -i -E 's/^[[:space:]]*max_execution_time[[:space:]]*=.*/max_execution_time = 300/' "$FPM_INI"
+      sed -i -E 's/^[[:space:]]*max_input_time[[:space:]]*=.*/max_input_time = 300/' "$FPM_INI"
+    fi
+  else
+    echo "  * Warning: Could not locate php.ini to update limits automatically."
+  fi
+}
+
 set_selinux () {
   #Check if SELinux is enforcing
   if [ "$(getenforce)" == "Enforcing" ]; then
@@ -476,7 +512,7 @@ case $distro in
         set_hosts
 
         install_snipeit
-
+		configure_php_upload_limit
         echo "* Restarting Apache httpd."
         /usr/sbin/service apache2 restart
 
