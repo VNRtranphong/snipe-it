@@ -641,7 +641,7 @@ case $distro in
     fi
   ;;
   Ubuntu)
-    if [ "${version//./}" -ge "2304" ]; then
+    if [ "${version//./}" -ge "2610" ]; then
         # Install for Ubuntu 23.04 and above
         set_fqdn
         set_dbpass
