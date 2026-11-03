@@ -267,7 +267,7 @@ echo "* Creating MariaDB Database/User."
   #TODO escape SED delimiter in variables
   sed -i '1 i\#Created By Snipe-it Installer' "$APP_PATH/.env"
   sed -i "s|^\\(APP_TIMEZONE=\\).*|\\1$tzone|" "$APP_PATH/.env"
-  sed -i "s|^\\(DB_HOST=\\).*|\\1localhost|" "$APP_PATH/.env"
+#  sed -i "s|^\\(DB_HOST=\\).*|\\1localhost|" "$APP_PATH/.env"
   sed -i "s|^\\(DB_DATABASE=\\).*|\\1snipeit|" "$APP_PATH/.env"
   sed -i "s|^\\(DB_USERNAME=\\).*|\\1snipeit_dbuser|" "$APP_PATH/.env"
   sed -i "s|^\\(DB_PASSWORD=\\).*|\\1'$mysqluserpw'|" "$APP_PATH/.env"
@@ -301,8 +301,20 @@ echo "* Creating MariaDB Database/User."
   echo "* Generating the application key."
   log "php $APP_PATH/artisan key:generate --force"
 
+  echo "* Waiting for MariaDB to be ready."
+  systemctl start mariadb.service >/dev/null 2>&1
+  for i in $(seq 1 30); do
+    mariadb-admin ping >/dev/null 2>&1 || mysqladmin ping >/dev/null 2>&1 && break
+    sleep 1
+  done
+
   echo "* Artisan Migrate."
   log "php $APP_PATH/artisan migrate --force"
+
+  # artisan above ran as root -> any log/cache files it created are root-owned,
+  # which makes Apache unable to write laravel.log (500 errors with no log).
+  chown -R "$APP_USER":"$apache_group" "$APP_PATH/storage" "$APP_PATH/bootstrap/cache"
+  chmod -R 775 "$APP_PATH/storage" "$APP_PATH/bootstrap/cache"
 
   echo "* Creating scheduler cron."
   (echo "* * * * * /usr/bin/php $APP_PATH/artisan schedule:run >> /dev/null 2>&1") | run_as_app_user crontab -
@@ -1152,6 +1164,15 @@ EOL
     echo "Your OS was not detected correctly."
     exit 1
 esac
+
+# Final safety net: make sure Apache can write logs/cache/backups no matter
+# which artisan commands above ran as root.
+if [ -d "$APP_PATH/storage" ]; then
+  echo "* Final permission fix for storage and bootstrap/cache."
+  mkdir -p "$APP_PATH/storage/app/backups" "$APP_PATH/storage/app/backup-temp"
+  chown -R "$APP_USER":"$apache_group" "$APP_PATH/storage" "$APP_PATH/bootstrap/cache"
+  chmod -R 775 "$APP_PATH/storage" "$APP_PATH/bootstrap/cache"
+fi
 
 setupmail=default
 until [[ $setupmail == "yes" ]] || [[ $setupmail == "no" ]]; do
