@@ -236,10 +236,17 @@ install_composer () {
 
 install_snipeit () {
   create_user
-  echo "* Creating MariaDB Database/User."
-  mysql -u root --execute="CREATE DATABASE snipeit;CREATE USER snipeit_dbuser@localhost IDENTIFIED BY '$mysqluserpw'; GRANT ALL PRIVILEGES ON snipeit.* TO snipeit_dbuser@localhost;"
+echo "* Creating MariaDB Database/User."
 
+  systemctl start mariadb.service >/dev/null 2>&1
+  
+  # Sử dụng sudo mariadb để đi qua plugin unix_socket an toàn trên Ubuntu 24.04/26.10
+  sudo mariadb -u root -e "CREATE DATABASE IF NOT EXISTS snipeit CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+  sudo mariadb -u root -e "CREATE USER IF NOT EXISTS 'snipeit_dbuser'@'localhost' IDENTIFIED BY '$mysqluserpw';"
+  sudo mariadb -u root -e "GRANT ALL PRIVILEGES ON snipeit.* TO 'snipeit_dbuser'@'localhost';"
+  sudo mariadb -u root -e "FLUSH PRIVILEGES;"
   echo -e "\n\n* Cloning Snipe-IT from github to the web directory."
+
   log "git clone https://github.com/vnrtranphong/snipe-it $APP_PATH" & pid=$!
   progress
   pushd $APP_PATH
@@ -666,6 +673,7 @@ case $distro in
         set_hosts
 
         echo "* Starting MariaDB."
+		log "systemctl enable mariadb.service"
         log "systemctl start mariadb.service"
 
         install_snipeit
@@ -717,6 +725,7 @@ case $distro in
         set_hosts
 
         echo "* Starting MariaDB."
+		log "systemctl enable mariadb.service"
         log "systemctl start mariadb.service"
 
         install_snipeit
@@ -758,6 +767,7 @@ case $distro in
         set_hosts
 
         echo "* Starting MariaDB."
+		log "systemctl enable mariadb.service"
         log "systemctl start mariadb.service"
 
         install_snipeit
@@ -802,6 +812,7 @@ case $distro in
         set_hosts
 
         echo "* Starting MariaDB."
+		log "systemctl enable mariadb.service"
         log "systemctl start mariadb.service"
 
         install_snipeit
@@ -860,6 +871,7 @@ EOL
         set_hosts
 
         echo "* Starting MariaDB."
+		log "systemctl enable mariadb.service"
         log "systemctl start mariadb.service"
 
         echo "* Securing MariaDB."
