@@ -35,6 +35,7 @@
 # * Fixed timezone awk                               #
 # * Minor display and logging improvements           #
 # * Add Redhat 10.x support                          #
+# * Ubuntu 26.x: MariaDB 11 backup/restore fixes     #
 ######################################################
 
 # Parse arguments
@@ -172,7 +173,7 @@ create_virtualhost () {
     echo "  DocumentRoot $APP_PATH/public"
     echo "  ServerName $fqdn"
     echo "</VirtualHost>"
-  } >> "$apachefile"
+  } > "$apachefile"
 }
 
 create_user () {
@@ -236,11 +237,25 @@ install_composer () {
 
 install_snipeit () {
   create_user
-  echo "* Creating MariaDB Database/User."
-  mysql -u root --execute="CREATE DATABASE snipeit;CREATE USER snipeit_dbuser@localhost IDENTIFIED BY '$mysqluserpw'; GRANT ALL PRIVILEGES ON snipeit.* TO snipeit_dbuser@localhost;"
+echo "* Creating MariaDB Database/User."
 
+  systemctl start mariadb.service >/dev/null 2>&1
+
+  # Script đã chạy bằng root -> kết nối qua unix_socket, không cần sudo.
+  # Dùng 'mariadb' nếu có (MariaDB 11+), fallback 'mysql' cho bản cũ.
+  if hash mariadb 2>/dev/null; then db_cli=mariadb; else db_cli=mysql; fi
+  if ! $db_cli -u root -e "
+      CREATE DATABASE IF NOT EXISTS snipeit CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      CREATE USER IF NOT EXISTS 'snipeit_dbuser'@'localhost' IDENTIFIED BY '$mysqluserpw';
+      ALTER USER 'snipeit_dbuser'@'localhost' IDENTIFIED BY '$mysqluserpw';
+      GRANT ALL PRIVILEGES ON snipeit.* TO 'snipeit_dbuser'@'localhost';
+      FLUSH PRIVILEGES;"; then
+    echo -e "\e[31m  ERROR: Could not create database/user. Check that MariaDB is running.\e[0m"
+    exit 1
+  fi
   echo -e "\n\n* Cloning Snipe-IT from github to the web directory."
-  log "git clone https://github.com/grokability/snipe-it $APP_PATH" & pid=$!
+
+  log "git clone https://github.com/vnrtranphong/snipe-it $APP_PATH" & pid=$!
   progress
   pushd $APP_PATH
   git checkout master
@@ -252,11 +267,13 @@ install_snipeit () {
   #TODO escape SED delimiter in variables
   sed -i '1 i\#Created By Snipe-it Installer' "$APP_PATH/.env"
   sed -i "s|^\\(APP_TIMEZONE=\\).*|\\1$tzone|" "$APP_PATH/.env"
-  sed -i "s|^\\(DB_HOST=\\).*|\\1localhost|" "$APP_PATH/.env"
+#  sed -i "s|^\\(DB_HOST=\\).*|\\1localhost|" "$APP_PATH/.env"
   sed -i "s|^\\(DB_DATABASE=\\).*|\\1snipeit|" "$APP_PATH/.env"
   sed -i "s|^\\(DB_USERNAME=\\).*|\\1snipeit_dbuser|" "$APP_PATH/.env"
   sed -i "s|^\\(DB_PASSWORD=\\).*|\\1'$mysqluserpw'|" "$APP_PATH/.env"
   sed -i "s|^\\(APP_URL=\\).*|\\1http://$fqdn|" "$APP_PATH/.env"
+
+  configure_db_dump
 
   echo "* Installing composer."
   install_composer
@@ -287,11 +304,65 @@ install_snipeit () {
   echo "* Generating the application key."
   log "php $APP_PATH/artisan key:generate --force"
 
+  echo "* Waiting for MariaDB to be ready."
+  systemctl start mariadb.service >/dev/null 2>&1
+  for i in $(seq 1 30); do
+    mariadb-admin ping >/dev/null 2>&1 || mysqladmin ping >/dev/null 2>&1 && break
+    sleep 1
+  done
+
   echo "* Artisan Migrate."
   log "php $APP_PATH/artisan migrate --force"
 
+  # artisan above ran as root -> any log/cache files it created are root-owned,
+  # which makes Apache unable to write laravel.log (500 errors with no log).
+  chown -R "$APP_USER":"$apache_group" "$APP_PATH/storage" "$APP_PATH/bootstrap/cache"
+  chmod -R 775 "$APP_PATH/storage" "$APP_PATH/bootstrap/cache"
+
   echo "* Creating scheduler cron."
   (echo "* * * * * /usr/bin/php $APP_PATH/artisan schedule:run >> /dev/null 2>&1") | run_as_app_user crontab -
+}
+
+# Set or add a KEY=VALUE in .env
+set_env () {
+  local key="$1" val="$2" f="$APP_PATH/.env"
+  if grep -q "^${key}=" "$f"; then
+    sed -i "s|^${key}=.*|${key}=${val}|" "$f"
+  else
+    echo "${key}=${val}" >> "$f"
+  fi
+}
+
+# Fix backup/restore on MariaDB 11.x (Ubuntu 24.04+/26.x, Debian 13):
+#  - mysql/mysqldump were renamed to mariadb/mariadb-dump (old names print a
+#    deprecation warning or are missing) -> provide wrappers named mysql/mysqldump
+#  - MariaDB 11.4+ clients require SSL by default -> disable for local connections
+configure_db_dump () {
+  echo "* Configuring database dump tools for backup/restore."
+  local dump_dir="/usr/bin"
+
+  if [ -x /usr/bin/mariadb-dump ] && [ -x /usr/bin/mariadb ]; then
+    dump_dir="/usr/local/lib/snipeit-dbtools"
+    mkdir -p "$dump_dir"
+    printf '#!/bin/sh\nexec /usr/bin/mariadb-dump "$@"\n' > "$dump_dir/mysqldump"
+    printf '#!/bin/sh\nexec /usr/bin/mariadb "$@"\n'      > "$dump_dir/mysql"
+    chmod 755 "$dump_dir/mysqldump" "$dump_dir/mysql"
+  fi
+
+  if [ -d /etc/mysql/mariadb.conf.d ]; then
+    printf '[client-mariadb]\nskip-ssl\n' > /etc/mysql/mariadb.conf.d/99-snipeit-client.cnf
+  fi
+
+  set_env DB_DUMP_PATH "'$dump_dir'"
+  set_env DB_DUMP_SKIP_SSL true
+}
+
+get_timezone () {
+  local tz
+  tz=$(timedatectl show --property=Timezone --value 2>/dev/null)
+  [ -z "$tz" ] && [ -f /etc/timezone ] && tz=$(cat /etc/timezone)
+  [ -z "$tz" ] && tz="UTC"
+  echo "$tz"
 }
 
 set_firewall () {
@@ -299,6 +370,26 @@ set_firewall () {
     echo "* Configuring firewall to allow HTTP traffic only."
     log "firewall-cmd --zone=public --add-port=http/tcp --permanent"
     log "firewall-cmd --reload"
+  fi
+}
+
+configure_php_upload_limit () {
+  echo "* Configuring PHP upload limits (200MB max)."
+  
+  # Tìm tất cả các file php.ini tồn tại trên hệ thống (Apache, CLI, FPM)
+  PHP_INI_FILES=$(find /etc/php /etc/php.ini /etc/php*.ini -name "php.ini" 2>/dev/null)
+
+  if [ -n "$PHP_INI_FILES" ]; then
+    for ini_file in $PHP_INI_FILES; do
+      echo "  * Updating PHP config at: $ini_file"
+      sed -i -E 's/^[[:space:]]*upload_max_filesize[[:space:]]*=.*/upload_max_filesize = 200M/' "$ini_file"
+      sed -i -E 's/^[[:space:]]*post_max_size[[:space:]]*=.*/post_max_size = 205M/' "$ini_file"
+      sed -i -E 's/^[[:space:]]*memory_limit[[:space:]]*=.*/memory_limit = 256M/' "$ini_file"
+      sed -i -E 's/^[[:space:]]*max_execution_time[[:space:]]*=.*/max_execution_time = 300/' "$ini_file"
+      sed -i -E 's/^[[:space:]]*max_input_time[[:space:]]*=.*/max_input_time = 300/' "$ini_file"
+    done
+  else
+    echo "  * Warning: Could not locate php.ini to update limits automatically."
   fi
 }
 
@@ -316,7 +407,7 @@ set_selinux () {
 
 set_hosts () {
   echo "* Setting up hosts file."
-  echo >> /etc/hosts "127.0.0.1 $(hostname) $fqdn"
+  grep -q " $fqdn\$" /etc/hosts || echo >> /etc/hosts "127.0.0.1 $(hostname) $fqdn"
 }
 
 rename_default_vhost () {
@@ -479,7 +570,7 @@ case $distro in
         set_hosts
 
         install_snipeit
-
+        configure_php_upload_limit
         echo "* Restarting Apache httpd."
         /usr/sbin/service apache2 restart
 
@@ -492,7 +583,7 @@ case $distro in
         # Install for Debian 12.x
         set_fqdn
         set_dbpass
-        tzone=$(cat /etc/timezone)
+        tzone=$(get_timezone)
 
         echo "* Adding PHP repository."
         log "apt-get install -y apt-transport-https lsb-release ca-certificates"
@@ -529,7 +620,7 @@ case $distro in
         # Install for Debian 11.x
         set_fqdn
         set_dbpass
-        tzone=$(cat /etc/timezone)
+        tzone=$(get_timezone)
 
         echo "* Adding PHP repository."
         log "apt-get install -y apt-transport-https lsb-release ca-certificates"
@@ -566,7 +657,7 @@ case $distro in
         # Install for Debian 10.x
         set_fqdn
         set_dbpass
-        tzone=$(cat /etc/timezone)
+        tzone=$(get_timezone)
 
         echo "* Adding PHP repository."
         log "apt-get install -y apt-transport-https lsb-release ca-certificates"
@@ -609,26 +700,21 @@ case $distro in
   ;;
   Ubuntu)
     if [ "${version//./}" -ge "2304" ]; then
-        # Install for Ubuntu 23.04 and above
+        # Install for Ubuntu 23.04 and above (tested target: 24.04 -> 26.10)
         set_fqdn
         set_dbpass
-        if [ "${version//./}" -ge "2604" ]; then
-            tzone=$(timedatectl show -p Timezone --value)
-        else
-            tzone=$(cat /etc/timezone)
-        fi
+        tzone=$(get_timezone)
 
         echo -n "* Updating installed packages."
         log "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade" & pid=$!
         progress
 
         echo "* Installing Apache httpd, PHP, MariaDB and other requirements."
-        PACKAGES="cron mariadb-server mariadb-client apache2 libapache2-mod-php php php-curl php-mysql php-gd php-ldap php-zip php-mbstring php-xml php-bcmath curl git unzip wget"
+        PACKAGES="cron mariadb-server mariadb-client apache2 libapache2-mod-php php php-curl php-mysql php-gd php-ldap php-zip php-mbstring php-xml php-bcmath php-intl curl git unzip wget"
         install_packages
 
         echo "* Configuring Apache."
         create_virtualhost
-        log "phpenmod mcrypt"
         log "phpenmod mbstring"
         log "a2enmod rewrite"
         log "a2ensite $APP_NAME.conf"
@@ -637,15 +723,19 @@ case $distro in
         set_hosts
 
         echo "* Starting MariaDB."
+        log "systemctl enable mariadb.service"
         log "systemctl start mariadb.service"
 
         install_snipeit
+        configure_php_upload_limit
 
-        echo "* Restarting Apache httpd."
+        echo "* Restarting Apache httpd and MariaDB."
+        log "systemctl restart mariadb.service"
         log "systemctl restart apache2"
 
         echo "* Clearing cache and setting final permissions."
         chmod 777 -R $APP_PATH/storage/framework/cache/
+        log "run_as_app_user php $APP_PATH/artisan config:clear"
         log "run_as_app_user php $APP_PATH/artisan cache:clear"
         chmod 775 -R $APP_PATH/storage/
     elif [[ "${is_mint}" == "true" ]]; then
@@ -662,7 +752,7 @@ case $distro in
 
         set_fqdn
         set_dbpass
-        tzone=$(cat /etc/timezone)
+        tzone=$(get_timezone)
 
         echo "* Set up Ondrej PHP repository"
         echo "# Odrej PHP repo for ability to choose non-distro PHP versions" > /etc/apt/sources.list.d/ppa_ondrej_php_$ubuntu_codename.list
@@ -688,6 +778,7 @@ case $distro in
         set_hosts
 
         echo "* Starting MariaDB."
+        log "systemctl enable mariadb.service"
         log "systemctl start mariadb.service"
 
         install_snipeit
@@ -703,7 +794,7 @@ case $distro in
         # Install for Ubuntu 22.04
         set_fqdn
         set_dbpass
-        tzone=$(cat /etc/timezone)
+        tzone=$(get_timezone)
 
         echo "* Set up Ondrej PHP repository"
         echo "# Odrej PHP repo for ability to choose non-distro PHP versions" > /etc/apt/sources.list.d/ppa_ondrej_php_$codename.list
@@ -729,6 +820,7 @@ case $distro in
         set_hosts
 
         echo "* Starting MariaDB."
+        log "systemctl enable mariadb.service"
         log "systemctl start mariadb.service"
 
         install_snipeit
@@ -748,7 +840,7 @@ case $distro in
         # Install for Ubuntu 20.04
         set_fqdn
         set_dbpass
-        tzone=$(cat /etc/timezone)
+        tzone=$(get_timezone)
 
         echo "* Set up Ondrej PHP repository"
         echo "deb http://ppa.launchpad.net/ondrej/php/ubuntu $codename main" >> /etc/apt/sources.list.d/ppa_ondrej_php_$codename.list
@@ -773,6 +865,7 @@ case $distro in
         set_hosts
 
         echo "* Starting MariaDB."
+        log "systemctl enable mariadb.service"
         log "systemctl start mariadb.service"
 
         install_snipeit
@@ -797,7 +890,7 @@ case $distro in
         # Install for Raspbian 9.x
         set_fqdn
         set_dbpass
-        tzone=$(cat /etc/timezone)
+        tzone=$(get_timezone)
         cat >/etc/apt/sources.list.d/10-buster.list <<EOL
 deb http://mirrordirector.raspbian.org/raspbian/ buster main contrib non-free rpi
 EOL
@@ -831,6 +924,7 @@ EOL
         set_hosts
 
         echo "* Starting MariaDB."
+        log "systemctl enable mariadb.service"
         log "systemctl start mariadb.service"
 
         echo "* Securing MariaDB."
@@ -1074,13 +1168,13 @@ EOL
     exit 1
 esac
 
-if [[ -z "$tzone" ]]; then
-    echo
-    echo "WARNING: Timezone not detected. Defaulting to UTC. Change it in .env later."
-    echo
-    echo "Press Enter to continue..."
-    read t
-    tzone=UTC
+# Final safety net: make sure Apache can write logs/cache/backups no matter
+# which artisan commands above ran as root.
+if [ -d "$APP_PATH/storage" ]; then
+  echo "* Final permission fix for storage and bootstrap/cache."
+  mkdir -p "$APP_PATH/storage/app/backups" "$APP_PATH/storage/app/backup-temp"
+  chown -R "$APP_USER":"$apache_group" "$APP_PATH/storage" "$APP_PATH/bootstrap/cache"
+  chmod -R 775 "$APP_PATH/storage" "$APP_PATH/bootstrap/cache"
 fi
 
 setupmail=default

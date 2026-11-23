@@ -188,25 +188,17 @@ class MaintenancesPresenter extends Presenter
                 'title' => trans('admin/maintenances/form.start_date'),
                 'formatter' => 'dateDisplayFormatter',
             ], [
-                'field' => 'expected_completion_date',
-                'scope' => 'col',
-                'searchable' => true,
-                'sortable' => true,
-                'title' => trans('admin/maintenances/form.completion_date'),
-                'formatter' => 'dateDisplayFormatter',
-            ], [
                 'field' => 'url',
                 'scope' => 'col',
                 'searchable' => true,
                 'sortable' => true,
-                'title' => trans('general.url'),
-                'formatter' => 'externalLinkFormatter',
+                'title' => trans('general.notes'),
             ], [
                 'field' => 'notes',
                 'scope' => 'col',
                 'searchable' => true,
                 'sortable' => true,
-                'title' => trans('admin/maintenances/form.notes'),
+                'title' => trans('general.huy'),
             ], [
                 'field' => 'is_warranty',
                 'scope' => 'col',
@@ -401,13 +393,6 @@ class MaintenancesPresenter extends Presenter
                 'title' => trans('admin/maintenances/form.start_date'),
                 'formatter' => 'dateDisplayFormatter',
             ], [
-                'field' => 'expected_completion_date',
-                'scope' => 'col',
-                'searchable' => true,
-                'sortable' => true,
-                'title' => trans('admin/maintenances/form.completion_date'),
-                'formatter' => 'dateDisplayFormatter',
-            ], [
                 'field' => 'asset_maintenance_time',
                 'scope' => 'col',
                 'searchable' => true,
@@ -436,14 +421,13 @@ class MaintenancesPresenter extends Presenter
                 'scope' => 'col',
                 'searchable' => true,
                 'sortable' => true,
-                'title' => trans('general.url'),
-                'formatter' => 'externalLinkFormatter',
+                'title' => trans('general.notes'),
             ], [
                 'field' => 'notes',
                 'scope' => 'col',
                 'searchable' => true,
                 'sortable' => true,
-                'title' => trans('admin/maintenances/form.notes'),
+                'title' => trans('general.huy'),
             ], [
                 'field' => 'is_warranty',
                 'scope' => 'col',

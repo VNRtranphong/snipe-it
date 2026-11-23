@@ -1,12 +1,12 @@
 <?php
 
 return [
-    'select_type' => 'Select Maintenance Type',
+    'select_type' => 'Chọn đúng tên part hư, hoặc Maintenance nếu là bảo trì bảo dưỡng',
     'asset_maintenance_type' => 'Type',
     'title' => 'Title',
     'start_date' => 'Start Date',
     'completion_date' => 'Expected Completion',
-    'cost' => 'Cost',
+    'cost' => 'Đơn giá không VAT',
     'is_warranty' => 'Warranty Improvement',
     'asset_maintenance_time' => 'Duration',
     'notes' => 'Notes',
