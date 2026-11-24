@@ -1,9 +1,12 @@
 <?php
 
 return [
-    'does_not_exist' => 'Site does not exist.',
-    'deleted' => 'Deleted Site',
-    'assoc_users' => 'This Site is currently associated with at least one model and cannot be deleted. Please update your models to no longer reference this Site and try again. ',
+
+    'does_not_exist' => 'Company does not exist.',
+    'deleted' => 'Deleted company',
+    'assoc_users' => 'This company is currently associated with at least one other item (location, user, license, asset, etc.) in Snipe-IT and cannot be deleted. Please update your models to no longer reference this company and try again. ',
+
+
     'create' => [
         'error' => 'Site was not created, please try again.',
         'success' => 'Site created successfully.',

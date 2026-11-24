@@ -177,14 +177,23 @@ class AcceptanceController extends Controller
                 // width/height is rejected without imagecreatefromstring
                 // decoding the raster or the flatten path allocating a second
                 // same-size buffer. IMAGETYPE_PNG is enforced because the
-                // signature-pad JavaScript creates only PNG files. 
+                // signature-pad JavaScript creates only PNG files.
+                //
+                // Dimension ceiling is operator-tunable via the
+                // ACCEPTANCE_SIGNATURE_MAX_DIMENSION env var.
+                $maxSignatureDimension = (int) config('app.acceptance_signature_max_dimension', 6000);
                 $imgInfo = @getimagesizefromstring($decoded_image);
-                if ($imgInfo === false
-                    || $imgInfo[2] !== IMAGETYPE_PNG
-                    || $imgInfo[0] > 6000
-                    || $imgInfo[1] > 6000
-                ) {
+                if ($imgInfo === false || $imgInfo[2] !== IMAGETYPE_PNG) {
                     return redirect()->back()->with('error', trans('general.shitty_browser'));
+                }
+                if ($imgInfo[0] > $maxSignatureDimension || $imgInfo[1] > $maxSignatureDimension) {
+                    // Specific error for the operator-tunable dimension
+                    // cap so a user on a high-DPI browser doesn't get
+                    // the misleading "use a more modern browser" message
+                    // when their browser is fine and their signature is
+                    // just physically too wide. The message tells the
+                    // user what to try and the admin what to tune.
+                    return redirect()->back()->with('error', trans('general.signature_too_large', ['max' => $maxSignatureDimension]));
                 }
 
                 // Flatten the signature's transparent background onto
@@ -255,9 +264,9 @@ class AcceptanceController extends Controller
         ];
 
         // Include asset custom fields that are explicitly allowed in outbound emails/PDFs.
-        if ($item instanceof Asset && $item->model && $item->model->fieldset) {
+        if ($item instanceof Asset && $item->custom_fieldset) {
             $customFields = [];
-            $fields = $item->model->fieldset->fields
+            $fields = $item->custom_fieldset->fields
                 ->where('show_in_email', true)
                 ->where('field_encrypted', false);
 
