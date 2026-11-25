@@ -43,10 +43,16 @@ class IncidentReportsController extends Controller
         $inRange = $this->repository->rowsInRange($filters);
         $rows = IncidentReportRepository::applyFilters($inRange, $filters);
 
+        // Cards count everything except the status filter, so clicking a
+        // card (which sets the status) does not change the numbers.
+        $forStats = $filters['status'] === ''
+            ? $rows
+            : IncidentReportRepository::applyFilters($inRange, ['status' => ''] + $filters);
+
         return view('incident-reports.index', [
             'filters' => $filters,
             'rows' => $rows,
-            'stats' => IncidentReportRepository::stats($rows),
+            'stats' => IncidentReportRepository::stats($forStats),
             'options' => IncidentReportRepository::options($inRange, $filters['site']),
             'truncated' => count($inRange) >= IncidentReportRepository::MAX_ROWS,
             'overdueHours' => IncidentReportRepository::OVERDUE_HOURS,

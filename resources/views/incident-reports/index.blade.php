@@ -14,6 +14,10 @@
     .ir-stats .info-box-content { margin-left: 74px; }
     .ir-stats .info-box-number { font-size: 22px; }
     .ir-filters .form-group { margin-right: 8px; margin-bottom: 8px; }
+    .ir-stats a.ir-card { display: block; color: inherit; text-decoration: none; }
+    .ir-stats a.ir-card .info-box { transition: box-shadow .15s, transform .15s; }
+    .ir-stats a.ir-card:hover .info-box { box-shadow: 0 3px 10px rgba(0,0,0,.18); transform: translateY(-1px); }
+    .ir-stats a.ir-card.active .info-box { box-shadow: 0 0 0 3px #3c8dbc; }
     .ir-filters label { display: block; font-weight: 600; font-size: 12px; margin-bottom: 2px; }
     .ir-table td { vertical-align: top !important; }
     .ir-table tr.ir-overdue td { background-color: rgba(221, 75, 57, 0.08); }
@@ -41,57 +45,47 @@
 <div class="row">
     <div class="col-md-12">
 
-        {{-- ====== Số liệu ====== --}}
+        {{-- ====== Số liệu (bấm để lọc danh sách) ====== --}}
+        @php
+            $cardBase = [
+                'from' => $filters['from']->format('Y-m-d'),
+                'to' => $filters['to']->format('Y-m-d'),
+                'site' => $filters['site'],
+                'hall' => $filters['hall'],
+                'equipment' => $filters['equipment'],
+                'q' => $filters['q'],
+            ];
+            $cardBase = array_filter($cardBase, fn ($v) => $v !== '') + ['site' => ''];
+            $cards = [
+                ['status' => '', 'color' => 'bg-blue', 'icon' => 'fa-list-ul', 'label' => 'Tổng sự cố',
+                 'number' => $stats['total'], 'note' => null],
+                ['status' => 'open', 'color' => 'bg-yellow', 'icon' => 'fa-tools', 'label' => 'Đang xử lý',
+                 'number' => $stats['open'], 'note' => null],
+                ['status' => 'overdue', 'color' => 'bg-red', 'icon' => 'fa-exclamation-triangle', 'label' => 'Quá '.$overdueHours.'h',
+                 'number' => $stats['overdue'], 'note' => $stats['overdue_open'].' vẫn chưa xong'],
+                ['status' => 'cancelled', 'color' => 'bg-purple', 'icon' => 'fa-film', 'label' => 'Suất bị hủy',
+                 'number' => $stats['cancelled'], 'note' => 'trong '.$stats['cancelled_incidents'].' sự cố'],
+            ];
+        @endphp
         <div class="row ir-stats">
-            <div class="col-lg-2 col-sm-4 col-xs-6">
-                <div class="info-box">
-                    <span class="info-box-icon bg-blue"><i class="fas fa-list-ul" aria-hidden="true"></i></span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">Tổng sự cố</span>
-                        <span class="info-box-number">{{ number_format($stats['total']) }}</span>
-                    </div>
+            @foreach ($cards as $card)
+                <div class="col-lg-3 col-sm-6 col-xs-6">
+                    <a href="{{ route('incident-reports.index', $cardBase + ($card['status'] !== '' ? ['status' => $card['status']] : [])) }}#ir-list"
+                       class="ir-card{{ $filters['status'] === $card['status'] ? ' active' : '' }}"
+                       title="Xem danh sách: {{ $card['label'] }}">
+                        <div class="info-box">
+                            <span class="info-box-icon {{ $card['color'] }}"><i class="fas {{ $card['icon'] }}" aria-hidden="true"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">{{ $card['label'] }}</span>
+                                <span class="info-box-number">{{ number_format($card['number']) }}</span>
+                                @if ($card['note'])
+                                    <span class="progress-description" style="font-size:12px">{{ $card['note'] }}</span>
+                                @endif
+                            </div>
+                        </div>
+                    </a>
                 </div>
-            </div>
-            <div class="col-lg-2 col-sm-4 col-xs-6">
-                <div class="info-box">
-                    <span class="info-box-icon bg-yellow"><i class="fas fa-tools" aria-hidden="true"></i></span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">Đang xử lý</span>
-                        <span class="info-box-number">{{ number_format($stats['open']) }}</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-sm-4 col-xs-6">
-                <div class="info-box">
-                    <span class="info-box-icon bg-red"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i></span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">Quá {{ $overdueHours }}h</span>
-                        <span class="info-box-number">{{ number_format($stats['overdue']) }}</span>
-                        <span class="progress-description" style="font-size:12px">{{ $stats['overdue_open'] }} vẫn chưa xong</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-2 col-sm-6 col-xs-6">
-                <div class="info-box">
-                    <span class="info-box-icon bg-purple"><i class="fas fa-film" aria-hidden="true"></i></span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">Suất bị hủy</span>
-                        <span class="info-box-number">{{ number_format($stats['cancelled']) }}</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-sm-6 col-xs-12">
-                <div class="info-box">
-                    <span class="info-box-icon bg-green"><i class="fas fa-stopwatch" aria-hidden="true"></i></span>
-                    <div class="info-box-content">
-                        <span class="info-box-text">TB thời gian xử lý</span>
-                        <span class="info-box-number">
-                            {{ $stats['avg_hours'] !== null ? \App\Services\MaintenanceForms\IncidentReportRepository::durationLabel($stats['avg_hours']) : '—' }}
-                        </span>
-                        <span class="progress-description" style="font-size:12px">tính trên sự cố đã xong</span>
-                    </div>
-                </div>
-            </div>
+            @endforeach
         </div>
 
         {{-- ====== Bộ lọc ====== --}}
@@ -148,6 +142,7 @@
                             <option value="open" @selected($filters['status'] === 'open')>Đang xử lý</option>
                             <option value="done" @selected($filters['status'] === 'done')>Hoàn thành</option>
                             <option value="overdue" @selected($filters['status'] === 'overdue')>Quá {{ $overdueHours }}h</option>
+                            <option value="cancelled" @selected($filters['status'] === 'cancelled')>Có hủy suất</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -235,7 +230,7 @@
         </div>
 
         {{-- ====== Danh sách ====== --}}
-        <div class="box box-default">
+        <div class="box box-default" id="ir-list">
             <div class="box-body">
                 <form method="POST" action="{{ route('incident-reports.bulk') }}" id="ir-bulk-form">
                     @csrf

@@ -26,6 +26,7 @@ class IncidentSummaryExporter
                 IncidentReportRepository::STATUS_OPEN => 'Đang xử lý',
                 IncidentReportRepository::STATUS_DONE => 'Hoàn thành',
                 IncidentReportRepository::STATUS_OVERDUE => 'Quá '.IncidentReportRepository::OVERDUE_HOURS.'h',
+                IncidentReportRepository::STATUS_CANCELLED => 'Có hủy suất',
                 default => null,
             },
         ]);

@@ -32,6 +32,9 @@ class IncidentReportRepository
 
     public const STATUS_OVERDUE = 'overdue';
 
+    /** Incidents that caused cancelled shows. */
+    public const STATUS_CANCELLED = 'cancelled';
+
     /**
      * Normalised filters from the request.
      *
@@ -58,7 +61,7 @@ class IncidentReportRepository
             'site' => $site,
             'hall' => trim((string) ($input['hall'] ?? '')),
             'equipment' => trim((string) ($input['equipment'] ?? '')),
-            'status' => in_array($input['status'] ?? '', [self::STATUS_OPEN, self::STATUS_DONE, self::STATUS_OVERDUE], true)
+            'status' => in_array($input['status'] ?? '', [self::STATUS_OPEN, self::STATUS_DONE, self::STATUS_OVERDUE, self::STATUS_CANCELLED], true)
                 ? $input['status'] : '',
             'q' => trim((string) ($input['q'] ?? '')),
         ];
@@ -163,6 +166,9 @@ class IncidentReportRepository
             if ($f['status'] === self::STATUS_OVERDUE && ! $r['overdue']) {
                 return false;
             }
+            if ($f['status'] === self::STATUS_CANCELLED && $r['cancelled_count'] <= 0) {
+                return false;
+            }
             if ($q !== '') {
                 $hay = self::fold(implode(' ', [
                     $r['name'], $r['description'], $r['asset_name'], $r['asset_tag'],
@@ -181,7 +187,7 @@ class IncidentReportRepository
      * Numbers for the cards on top of the page.
      *
      * @param  list<array<string, mixed>>  $rows
-     * @return array{total: int, open: int, overdue: int, overdue_open: int, cancelled: int, avg_hours: float|null}
+     * @return array{total: int, open: int, overdue: int, overdue_open: int, cancelled: int, cancelled_incidents: int, avg_hours: float|null}
      */
     public static function stats(array $rows): array
     {
@@ -193,6 +199,7 @@ class IncidentReportRepository
             'overdue' => count(array_filter($rows, fn ($r) => $r['overdue'])),
             'overdue_open' => count(array_filter($rows, fn ($r) => $r['overdue'] && ! $r['done'])),
             'cancelled' => array_sum(array_map(fn ($r) => $r['cancelled_count'], $rows)),
+            'cancelled_incidents' => count(array_filter($rows, fn ($r) => $r['cancelled_count'] > 0)),
             'avg_hours' => $doneHours ? array_sum($doneHours) / count($doneHours) : null,
         ];
     }
