@@ -11,10 +11,12 @@ use App\Models\Asset;
 use App\Models\Company;
 use App\Models\Maintenance;
 use App\Models\MaintenanceType;
+use App\Services\MaintenanceForms\MaintenanceFormExporter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * This controller handles all actions related to Asset Maintenance for
@@ -412,5 +414,31 @@ class MaintenancesController extends Controller
         $this->authorize('view', $maintenance->asset);
 
         return view('maintenances.view')->with('maintenance', $maintenance);
+    }
+
+    /**
+     * Download the "Biên bản sự cố kỹ thuật" form (xlsx) pre-filled
+     * from this maintenance record.
+     */
+    public function exportIncidentReport(Maintenance $maintenance, MaintenanceFormExporter $exporter): BinaryFileResponse
+    {
+        $this->authorize('view', $maintenance->asset);
+
+        [$path, $filename] = $exporter->incidentReport($maintenance);
+
+        return response()->download($path, $filename)->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Download the "Maintenance/Services Report - Projection" form (xlsx)
+     * pre-filled from this maintenance record.
+     */
+    public function exportServiceReport(Maintenance $maintenance, MaintenanceFormExporter $exporter): BinaryFileResponse
+    {
+        $this->authorize('view', $maintenance->asset);
+
+        [$path, $filename] = $exporter->serviceReport($maintenance);
+
+        return response()->download($path, $filename)->deleteFileAfterSend(true);
     }
 }

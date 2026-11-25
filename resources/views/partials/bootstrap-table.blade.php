@@ -4332,6 +4332,10 @@
             actions += '<button type="button" class="actions btn btn-sm btn-default hidden-print disabled" disabled data-tooltip="true" title="{{ trans('admin/maintenances/form.already_complete') }}"><x-icon type="checkmark" class="fa-fw" /><span class="sr-only">{{ trans('admin/maintenances/form.already_complete') }}</span></button>&nbsp;';
         }
 
+        // Galaxy forms: Biên bản sự cố + Service Report (xlsx)
+        actions += '<a href="{{ config('app.url') }}/maintenances/' + row.id + '/export/incident-report" class="actions btn btn-sm bg-orange hidden-print" data-tooltip="true" title="{{ trans('admin/maintenances/general.export_incident_report') }}"><i class="fas fa-exclamation-triangle fa-fw" aria-hidden="true"></i><span class="sr-only">{{ trans('admin/maintenances/general.export_incident_report') }}</span></a>&nbsp;';
+        actions += '<a href="{{ config('app.url') }}/maintenances/' + row.id + '/export/service-report" class="actions btn btn-sm btn-info hidden-print" data-tooltip="true" title="{{ trans('admin/maintenances/general.export_service_report') }}"><i class="fas fa-file-alt fa-fw" aria-hidden="true"></i><span class="sr-only">{{ trans('admin/maintenances/general.export_service_report') }}</span></a>&nbsp;';
+
         if ((row.available_actions) && (row.available_actions.delete === true)) {
             actions += '<a href="{{ config('app.url') }}/maintenances/' + row.id + '" '
                 + ' class="actions btn btn-danger btn-sm delete-asset hidden-print" data-tooltip="true" '

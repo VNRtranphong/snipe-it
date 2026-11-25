@@ -1,0 +1,361 @@
+<?php
+
+namespace App\Services\MaintenanceForms;
+
+use App\Models\Asset;
+use App\Models\Location;
+use App\Models\Maintenance;
+use Carbon\Carbon;
+use Illuminate\Support\Str;
+
+/**
+ * Builds the two Galaxy Cinema forms from a maintenance record:
+ *  - "Biên bản sự cố kỹ thuật" (sheet "Biên bản sự cố")
+ *  - "Maintenance/Services Report - Projection" (sheet "Report")
+ *
+ * Both live in one template workbook: resources/templates/maintenances/Form_BBSC.xlsx.
+ * To change the layout, edit that file in Excel – but keep the cell
+ * positions used below (or update the constants here).
+ */
+class MaintenanceFormExporter
+{
+    public const SHEET_INCIDENT = 'Biên bản sự cố';
+
+    public const SHEET_SERVICE = 'Report';
+
+    /**
+     * Equipment checkboxes on the incident sheet, checked in this order.
+     * The first pattern that matches the asset's category (then model /
+     * asset name) is ticked. Order matters: "máy phát điện" must be
+     * tested before "điện", "xử lý nước thải" before "nước".
+     *
+     * @var array<string, string> cell => regex on ascii-lowercased text
+     */
+    private const EQUIPMENT_BOXES = [
+        'A5' => '/projector|may chieu/',
+        'C5' => '/server|\bimb\b|\bims\b/',
+        'E5' => '/processor|\bcp\d{3}\b/',
+        'G5' => '/amplifier|\bamp\b|\bampli\b/',
+        'I5' => '/speaker|\bloa\b/',
+        'K5' => '/\btms\b/',
+        'A6' => '/may lanh|dieu hoa|air ?con/',
+        'C6' => '/may phat|generator/',
+        'E6' => '/\bups\b/',
+        'G6' => '/cctv|camera/',
+        'I6' => '/\btv\b|\bled\b|man hinh/',
+        'C7' => '/xlnt|xu ly nuoc thai/',
+        'K6' => '/\bdien\b/',
+        'A7' => '/\bnuoc\b/',
+        'E7' => '/csvc|co so vat chat/',
+        'G7' => '/xe bap/',
+        'I7' => '/ham bap/',
+    ];
+
+    private const BOX_OTHER = 'K7';
+
+    public function __construct(private ?string $templatePath = null)
+    {
+        $this->templatePath ??= resource_path('templates/maintenances/Form_BBSC.xlsx');
+    }
+
+    /** @return array{0: string, 1: string} [temp file path, download filename] */
+    public function incidentReport(Maintenance $maintenance): array
+    {
+        $data = self::collect($maintenance);
+        $path = $this->tempPath();
+        $this->fillIncident($data, $path);
+
+        return [$path, $this->fileName('BBSC', $data)];
+    }
+
+    /** @return array{0: string, 1: string} [temp file path, download filename] */
+    public function serviceReport(Maintenance $maintenance): array
+    {
+        $data = self::collect($maintenance);
+        $path = $this->tempPath();
+        $this->fillService($data, $path);
+
+        return [$path, $this->fileName('ServiceReport', $data)];
+    }
+
+    // ------------------------------------------------------------------
+    // Data gathering
+    // ------------------------------------------------------------------
+
+    /**
+     * Flatten everything the forms need into plain strings.
+     *
+     * Field meaning in this install (see MaintenancesPresenter):
+     *  - `url`   column is labelled "Ghi chú"      => incident description
+     *  - `notes` column is labelled "Số suất hủy"  => cancelled shows
+     *
+     * @return array<string, mixed>
+     */
+    public static function collect(Maintenance $maintenance): array
+    {
+        $asset = $maintenance->asset;
+        if (! $asset && $maintenance->item instanceof Asset) {
+            $asset = $maintenance->item;
+        }
+
+        [$site, $hall] = self::siteAndHall($asset);
+
+        $technician = $maintenance->responsibleParty?->display_name
+            ?? $maintenance->adminuser?->display_name
+            ?? '';
+
+        return [
+            'id' => (int) $maintenance->id,
+            'name' => (string) $maintenance->name,
+            'description' => trim((string) $maintenance->url),
+            'cancelled_shows' => trim(strip_tags((string) $maintenance->notes)),
+            'type' => (string) ($maintenance->maintenanceType?->name ?? ''),
+            'is_warranty' => (bool) $maintenance->is_warranty,
+            'supplier' => (string) ($maintenance->supplier?->name ?? ''),
+            'start_date' => self::date($maintenance->start_date),
+            'expected_date' => self::date($maintenance->expected_completion_date),
+            'completed_at' => self::date($maintenance->completed_at),
+            'technician' => (string) $technician,
+            'asset_name' => (string) ($asset?->name ?? ''),
+            'asset_tag' => (string) ($asset?->asset_tag ?? ''),
+            'serial' => (string) ($asset?->serial ?? ''),
+            'model' => (string) ($asset?->model?->name ?? ''),
+            'model_number' => (string) ($asset?->model?->model_number ?? ''),
+            'category' => (string) ($asset?->model?->category?->name ?? ''),
+            'purchase_date' => self::date($asset?->purchase_date),
+            'site' => $site,
+            'hall' => $hall,
+        ];
+    }
+
+    /**
+     * Site = the cinema (e.g. "Huỳnh Tấn Phát"), Hall = the auditorium.
+     * Assets are usually checked out to a "Hall N" location whose parent
+     * (or the asset's own location) is the site.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private static function siteAndHall(?Asset $asset): array
+    {
+        if (! $asset) {
+            return ['', ''];
+        }
+
+        $isHall = fn (?Location $l) => $l && preg_match('/\b(hall|phong chieu)\b/i', Str::ascii($l->name));
+
+        $candidates = array_filter([
+            $asset->assignedTo instanceof Location ? $asset->assignedTo : null,
+            $asset->location,
+            $asset->defaultLoc,
+        ]);
+
+        $hallLoc = null;
+        $siteLoc = null;
+        foreach ($candidates as $loc) {
+            if ($isHall($loc)) {
+                $hallLoc ??= $loc;
+            } else {
+                $siteLoc ??= $loc;
+            }
+        }
+        if (! $siteLoc && $hallLoc?->parent) {
+            $siteLoc = $hallLoc->parent;
+        }
+
+        $hall = $hallLoc ? trim(preg_replace('/^\s*hall\s*/i', '', $hallLoc->name)) : '';
+        $site = $siteLoc?->name ?? ($asset->company?->name ?? '');
+
+        return [(string) $site, $hall];
+    }
+
+    private static function date(mixed $value): string
+    {
+        if (empty($value)) {
+            return '';
+        }
+
+        try {
+            return Carbon::parse($value)->format('d/m/Y');
+        } catch (\Throwable) {
+            return (string) $value;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Filling the sheets (plain arrays in, so this part is unit-testable)
+    // ------------------------------------------------------------------
+
+    /** @param array<string, mixed> $d */
+    public function fillIncident(array $d, string $outputPath): string
+    {
+        $s = self::SHEET_INCIDENT;
+        $x = new XlsxTemplateFiller($this->templatePath, $outputPath);
+
+        $docDate = $d['start_date'] ?: Carbon::now()->format('d/m/Y');
+        $x->setCell($s, 'A3', sprintf('Số: %s-%02d.%s-BBSC', self::siteCode($d['site']), $d['id'], $docDate));
+
+        // I. Thiết bị
+        $x->tick($s, self::equipmentBox($d));
+        $x->setCell($s, 'A9', 'Tên thiết bị: '.$d['asset_name'].($d['asset_tag'] ? ' ('.$d['asset_tag'].')' : ''));
+        $x->setCell($s, 'G9', 'Model: '.self::modelLabel($d));
+        $x->setCell($s, 'A10', 'Serial No: '.$d['serial']);
+        $x->setCell($s, 'G10', 'Thời gian đưa vào sử dụng: '.$d['purchase_date']);
+        $x->setCell($s, 'A11', 'Site: '.$d['site']);
+        $x->setCell($s, 'G11', 'Hall: '.$d['hall']);
+
+        // II. Thông tin sự cố
+        $description = 'Ngày '.$d['start_date'].': '.$d['name'];
+        if ($d['description'] !== '') {
+            $description .= "\n".$d['description'];
+        }
+        $x->setCell($s, 'B14', $description);
+        $x->setCell($s, 'H14', $d['cancelled_shows']);
+        $x->setCell($s, 'J14', trim($d['type'].($d['supplier'] ? "\nNCC: ".$d['supplier'] : '')));
+
+        // Grow the row when the description is long (template row = 84.6pt ≈ 5 lines).
+        $lines = self::estimateLines($description, 60);
+        if ($lines > 5) {
+            $x->setRowHeight($s, 14, min(409, $lines * 16.5));
+        }
+
+        // III. Phương án xử lý – tình trạng
+        if ($d['is_warranty']) {
+            $x->tick($s, 'A19');
+        }
+        if ($d['completed_at'] !== '') {
+            $x->tick($s, 'F17');
+        }
+        $x->setCell($s, 'J17', $d['completed_at'] !== '' ? 'Hoàn thành '.$d['completed_at'] : $d['expected_date']);
+
+        $x->showOnlySheet($s);
+
+        return $x->save();
+    }
+
+    /** @param array<string, mixed> $d */
+    public function fillService(array $d, string $outputPath): string
+    {
+        $s = self::SHEET_SERVICE;
+        $x = new XlsxTemplateFiller($this->templatePath, $outputPath);
+
+        $x->setCell($s, 'A2', 'Họ và Tên :  '.$d['technician']);
+        $x->setCell($s, 'I2', ' Site công tác : '.$d['site']);
+        $x->setCell($s, 'I3', ' Ngày công tác : '.$d['start_date']);
+        $x->setCell($s, 'G4', 'Hall :  '.$d['hall']);
+
+        // A: thiết bị – điền vào đúng khối theo loại thiết bị
+        $box = self::equipmentBox($d);
+        $model = self::modelLabel($d);
+        if ($box === 'A5') {
+            $x->setCell($s, 'B6', "Projector : {$model}\nSerial : {$d['serial']}");
+        } elseif ($box === 'C5') {
+            $x->setCell($s, 'E6', "Server: {$model}\nSerial: {$d['serial']}");
+        } elseif (in_array($box, ['E5', 'G5', 'I5'], true)) {
+            $x->setCell($s, 'K6', "Sound : {$model} - SN: {$d['serial']}");
+        }
+
+        // B: Công việc – mỗi dòng ghi chú 1 dòng công việc (tối đa 5)
+        $work = self::splitLines($d['description']);
+        if ($work === []) {
+            $work = [$d['name']];
+        }
+        if (count($work) > 5) {
+            $work = array_merge(array_slice($work, 0, 4), [implode('; ', array_slice($work, 4))]);
+        }
+        // Template quirk: B19 is centre-aligned while B16-B18 are left-aligned.
+        $x->copyStyle($s, 'B16', 'B19');
+        foreach ($work as $i => $line) {
+            $x->setCell($s, 'B'.(16 + $i), $line);
+        }
+
+        $x->setCell($s, 'K16', $d['is_warranty'] ? 'Bảo hành' : $d['type']);
+        $x->setCell($s, 'M16', $d['completed_at'] !== '' ? 'Hoàn thành' : 'Đang xử lý');
+        if ($d['cancelled_shows'] !== '' && $d['cancelled_shows'] !== '0') {
+            $x->setCell($s, 'O16', 'Hủy '.$d['cancelled_shows'].' suất');
+        }
+
+        $x->fitToOnePage($s, 'landscape');
+        $x->showOnlySheet($s);
+
+        return $x->save();
+    }
+
+    // ------------------------------------------------------------------
+
+    /** @param array<string, mixed> $d */
+    public static function equipmentBox(array $d): string
+    {
+        // Category first – it is the most reliable signal – then names.
+        foreach ([$d['category'], $d['model'].' '.$d['asset_name']] as $text) {
+            $hay = Str::lower(Str::ascii((string) $text));
+            if (trim($hay) === '') {
+                continue;
+            }
+            foreach (self::EQUIPMENT_BOXES as $cell => $regex) {
+                if (preg_match($regex, $hay)) {
+                    return $cell;
+                }
+            }
+        }
+
+        return self::BOX_OTHER;
+    }
+
+    /** @param array<string, mixed> $d */
+    private static function modelLabel(array $d): string
+    {
+        $model = $d['model'];
+        if ($d['model_number'] !== '' && ! str_contains($model, $d['model_number'])) {
+            $model = trim($model.' ('.$d['model_number'].')');
+        }
+
+        return $model;
+    }
+
+    /** "Huỳnh Tấn Phát" => "HTP", "Nguyễn Du" => "ND". */
+    public static function siteCode(string $site): string
+    {
+        $words = preg_split('/\s+/', trim(Str::ascii($site))) ?: [];
+        $code = '';
+        foreach ($words as $w) {
+            if ($w !== '' && ctype_alpha($w[0])) {
+                $code .= strtoupper($w[0]);
+            }
+        }
+
+        return $code !== '' ? $code : 'GLX';
+    }
+
+    /** @return list<string> */
+    private static function splitLines(string $text): array
+    {
+        $lines = preg_split('/\R/u', $text) ?: [];
+        $lines = array_map(fn ($l) => trim(preg_replace('/^\s*[-•*+]\s*/u', '', $l)), $lines);
+
+        return array_values(array_filter($lines, fn ($l) => $l !== ''));
+    }
+
+    private static function estimateLines(string $text, int $charsPerLine): int
+    {
+        $n = 0;
+        foreach (preg_split('/\R/u', $text) ?: [] as $line) {
+            $n += max(1, (int) ceil(mb_strlen($line) / $charsPerLine));
+        }
+
+        return $n;
+    }
+
+    private function tempPath(): string
+    {
+        return sys_get_temp_dir().DIRECTORY_SEPARATOR.'mtform_'.Str::random(20).'.xlsx';
+    }
+
+    /** @param array<string, mixed> $d */
+    private function fileName(string $prefix, array $d): string
+    {
+        $tag = preg_replace('/[^A-Za-z0-9_-]+/', '', Str::ascii($d['asset_tag'] ?: 'maintenance-'.$d['id']));
+        $date = $d['start_date'] ? str_replace('/', '-', $d['start_date']) : date('d-m-Y');
+
+        return "{$prefix}_{$tag}_{$date}.xlsx";
+    }
+}

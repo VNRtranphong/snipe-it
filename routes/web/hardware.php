@@ -259,6 +259,14 @@ Route::post('maintenances/{maintenance}/complete',
     [MaintenancesController::class, 'complete']
 )->name('maintenances.complete')->middleware(['auth']);
 
+Route::get('maintenances/{maintenance}/export/incident-report',
+    [MaintenancesController::class, 'exportIncidentReport']
+)->name('maintenances.export.incident')->middleware(['auth']);
+
+Route::get('maintenances/{maintenance}/export/service-report',
+    [MaintenancesController::class, 'exportServiceReport']
+)->name('maintenances.export.service')->middleware(['auth']);
+
 Route::post('maintenances/bulk',
     [BulkMaintenancesController::class, 'store']
 )->name('maintenances.bulk')->middleware(['auth']);

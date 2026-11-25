@@ -21,4 +21,6 @@ return [
     'due' => 'Due',
     'overdue' => 'Overdue',
     'completed' => 'Completed',
+    'export_incident_report' => 'Export incident report (BBSC)',
+    'export_service_report' => 'Export service report',
 ];

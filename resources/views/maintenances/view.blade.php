@@ -210,6 +210,14 @@
                                 <span class="sr-only">{{ trans('admin/maintenances/form.already_complete') }}</span>
                             </span>
                         @endif
+                        <a href="{{ route('maintenances.export.incident', $maintenance) }}" class="btn btn-sm bg-orange" data-tooltip="true" title="{{ trans('admin/maintenances/general.export_incident_report') }}">
+                            <i class="fas fa-exclamation-triangle fa-fw" aria-hidden="true"></i>
+                            <span class="sr-only">{{ trans('admin/maintenances/general.export_incident_report') }}</span>
+                        </a>
+                        <a href="{{ route('maintenances.export.service', $maintenance) }}" class="btn btn-sm btn-info" data-tooltip="true" title="{{ trans('admin/maintenances/general.export_service_report') }}">
+                            <i class="fas fa-file-alt fa-fw" aria-hidden="true"></i>
+                            <span class="sr-only">{{ trans('admin/maintenances/general.export_service_report') }}</span>
+                        </a>
                         <x-button.delete :item="$maintenance" />
                     </x-slot:buttons>
 

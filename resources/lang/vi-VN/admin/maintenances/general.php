@@ -21,4 +21,6 @@ return [
     'due' => 'Due',
     'overdue' => 'Overdue',
     'completed' => 'Completed',
+    'export_incident_report' => 'Xuất biên bản sự cố',
+    'export_service_report' => 'Xuất Service Report',
 ];
