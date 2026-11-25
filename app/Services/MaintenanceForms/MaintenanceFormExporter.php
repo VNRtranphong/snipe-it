@@ -53,6 +53,9 @@ class MaintenanceFormExporter
 
     private const BOX_OTHER = 'K7';
 
+    /** Font size of the "Serial" line in the Report header boxes (template uses 18). */
+    private const SERIAL_FONT_SIZE = 12;
+
     public function __construct(private ?string $templatePath = null)
     {
         $this->templatePath ??= resource_path('templates/maintenances/Form_BBSC.xlsx');
@@ -196,7 +199,7 @@ class MaintenanceFormExporter
 
         // I. Thiết bị
         $x->tick($s, self::equipmentBox($d));
-        $x->setCell($s, 'A9', 'Tên thiết bị: '.$d['asset_name'].($d['asset_tag'] ? ' ('.$d['asset_tag'].')' : ''));
+        $x->setCell($s, 'A9', 'Tên thiết bị: '.$d['asset_name']);
         $x->setCell($s, 'G9', 'Model: '.self::modelLabel($d));
         $x->setCell($s, 'A10', 'Serial No: '.$d['serial']);
         $x->setCell($s, 'G10', 'Thời gian đưa vào sử dụng: '.$d['purchase_date']);
@@ -210,7 +213,7 @@ class MaintenanceFormExporter
         }
         $x->setCell($s, 'B14', $description);
         $x->setCell($s, 'H14', $d['cancelled_shows']);
-        $x->setCell($s, 'J14', trim($d['type'].($d['supplier'] ? "\nNCC: ".$d['supplier'] : '')));
+        $x->setCell($s, 'J14', ''); // Ghi chú: để trống cho ghi tay
 
         // Grow the row when the description is long (template row = 84.6pt ≈ 5 lines).
         $lines = self::estimateLines($description, 60);
@@ -246,27 +249,18 @@ class MaintenanceFormExporter
         // A: thiết bị – điền vào đúng khối theo loại thiết bị
         $box = self::equipmentBox($d);
         $model = self::modelLabel($d);
+        // B6/E6 are two-run cells (big bold model line + smaller serial
+        // line); setRuns keeps each run's font size.
         if ($box === 'A5') {
-            $x->setCell($s, 'B6', "Projector : {$model}\nSerial : {$d['serial']}");
+            $x->setRuns($s, 'B6', ["Projector : {$model}", "\nSerial : {$d['serial']}"], [1 => self::SERIAL_FONT_SIZE]);
         } elseif ($box === 'C5') {
-            $x->setCell($s, 'E6', "Server: {$model}\nSerial: {$d['serial']}");
+            $x->setRuns($s, 'E6', ["Server: {$model}", "\nSerial: {$d['serial']}"], [1 => self::SERIAL_FONT_SIZE]);
         } elseif (in_array($box, ['E5', 'G5', 'I5'], true)) {
             $x->setCell($s, 'K6', "Sound : {$model} - SN: {$d['serial']}");
         }
 
-        // B: Công việc – mỗi dòng ghi chú 1 dòng công việc (tối đa 5)
-        $work = self::splitLines($d['description']);
-        if ($work === []) {
-            $work = [$d['name']];
-        }
-        if (count($work) > 5) {
-            $work = array_merge(array_slice($work, 0, 4), [implode('; ', array_slice($work, 4))]);
-        }
-        // Template quirk: B19 is centre-aligned while B16-B18 are left-aligned.
-        $x->copyStyle($s, 'B16', 'B19');
-        foreach ($work as $i => $line) {
-            $x->setCell($s, 'B'.(16 + $i), $line);
-        }
+        // B: Công việc – "Xử lí sự cố <tên phiếu bảo trì>"
+        $x->setCell($s, 'B16', self::workLine($d['name']));
 
         $x->setCell($s, 'K16', $d['is_warranty'] ? 'Bảo hành' : $d['type']);
         $x->setCell($s, 'M16', $d['completed_at'] !== '' ? 'Hoàn thành' : 'Đang xử lý');
@@ -326,13 +320,17 @@ class MaintenanceFormExporter
         return $code !== '' ? $code : 'GLX';
     }
 
-    /** @return list<string> */
-    private static function splitLines(string $text): array
+    /** "Hư CCB" => "Xử lí sự cố hư CCB" (keeps acronyms like "HDD lỗi"). */
+    private static function workLine(string $name): string
     {
-        $lines = preg_split('/\R/u', $text) ?: [];
-        $lines = array_map(fn ($l) => trim(preg_replace('/^\s*[-•*+]\s*/u', '', $l)), $lines);
+        $name = trim($name);
+        $first = mb_substr($name, 0, 1);
+        $second = mb_substr($name, 1, 1);
+        if ($second !== '' && mb_strtolower($second) === $second) {
+            $name = mb_strtolower($first).mb_substr($name, 1);
+        }
 
-        return array_values(array_filter($lines, fn ($l) => $l !== ''));
+        return trim('Xử lí sự cố '.$name);
     }
 
     private static function estimateLines(string $text, int $charsPerLine): int

@@ -99,15 +99,153 @@ class XlsxTemplateFiller
         return $xp->evaluate('string(m:v)', $cell);
     }
 
-    /** Turn "☐ Label" into "☑ Label" in the given cell. */
+    /**
+     * Turn "☐ Label" into "☑ Label" in the given cell, keeping the
+     * per-run fonts of the template (☐ is MS Gothic, label is Times).
+     */
     public function tick(string $sheet, string $ref): self
     {
-        $text = $this->getCell($sheet, $ref);
-        if (str_contains($text, '☐')) {
-            $this->setCell($sheet, $ref, preg_replace('/☐/u', '☑', $text, 1));
+        $runs = $this->getRuns($sheet, $ref);
+        if ($runs === null) {
+            $text = $this->getCell($sheet, $ref);
+            if (str_contains($text, '☐')) {
+                $this->setCell($sheet, $ref, preg_replace('/☐/u', '☑', $text, 1));
+            }
+
+            return $this;
+        }
+
+        foreach ($runs as $i => $text) {
+            if (str_contains($text, '☐')) {
+                $runs[$i] = preg_replace('/☐/u', '☑', $text, 1);
+
+                return $this->setRuns($sheet, $ref, $runs);
+            }
         }
 
         return $this;
+    }
+
+    /**
+     * Texts of the rich-text runs of a cell, or null when the cell is
+     * plain text.
+     *
+     * @return list<string>|null
+     */
+    public function getRuns(string $sheet, string $ref): ?array
+    {
+        $si = $this->richSource($sheet, $ref);
+        if (! $si) {
+            return null;
+        }
+
+        $xp = $this->xpath($si->ownerDocument);
+        $texts = [];
+        foreach ($xp->query('m:r', $si) as $r) {
+            $texts[] = $xp->evaluate('string(m:t)', $r);
+        }
+
+        return $texts;
+    }
+
+    /**
+     * Replace the text of each rich-text run while keeping its font
+     * (size, bold, family). $texts[i] = null keeps run i unchanged.
+     * Falls back to setCell() for plain cells.
+     *
+     * @param  list<string|null>  $texts
+     * @param  array<int, float>  $sizes  optional font size override per run index
+     */
+    public function setRuns(string $sheet, string $ref, array $texts, array $sizes = []): self
+    {
+        $si = $this->richSource($sheet, $ref);
+        if (! $si) {
+            return $this->setCell($sheet, $ref, implode('', array_map('strval', $texts)));
+        }
+
+        $cell = $this->findOrCreateCell($sheet, $ref);
+        $doc = $cell->ownerDocument;
+        $runs = iterator_to_array($this->xpath($si->ownerDocument)->query('m:r', $si));
+
+        $is = $doc->createElementNS(self::NS_MAIN, 'is');
+        foreach ($runs as $i => $run) {
+            /** @var DOMElement $copy */
+            $copy = $doc->importNode($run, true);
+            if (array_key_exists($i, $texts) && $texts[$i] !== null) {
+                foreach (iterator_to_array($copy->getElementsByTagNameNS(self::NS_MAIN, 't')) as $t) {
+                    $copy->removeChild($t);
+                }
+                $t = $doc->createElementNS(self::NS_MAIN, 't');
+                $t->setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve');
+                $t->appendChild($doc->createTextNode($this->cleanText($texts[$i])));
+                $copy->appendChild($t);
+            }
+            if (isset($sizes[$i])) {
+                $this->setRunSize($copy, $sizes[$i]);
+            }
+            $is->appendChild($copy);
+        }
+
+        while ($cell->firstChild) {
+            $cell->removeChild($cell->firstChild);
+        }
+        $cell->setAttribute('t', 'inlineStr');
+        $cell->appendChild($is);
+
+        return $this;
+    }
+
+    /** Set <rPr><sz val=".."/></rPr> on a run, creating rPr if needed. */
+    private function setRunSize(DOMElement $run, float $size): void
+    {
+        $doc = $run->ownerDocument;
+        $rPr = $run->getElementsByTagNameNS(self::NS_MAIN, 'rPr')->item(0);
+        if (! $rPr) {
+            $rPr = $doc->createElementNS(self::NS_MAIN, 'rPr');
+            $run->insertBefore($rPr, $run->firstChild);
+        }
+        $sz = $rPr->getElementsByTagNameNS(self::NS_MAIN, 'sz')->item(0);
+        if (! $sz) {
+            $sz = $doc->createElementNS(self::NS_MAIN, 'sz');
+            // sz must follow b/i/strike/... and precede color/rFont.
+            $after = null;
+            foreach ($rPr->childNodes as $child) {
+                if ($child instanceof DOMElement && in_array($child->localName, ['color', 'rFont', 'family', 'charset', 'scheme', 'u', 'vertAlign'], true)) {
+                    $after = $child;
+                    break;
+                }
+            }
+            $rPr->insertBefore($sz, $after);
+        }
+        $sz->setAttribute('val', (string) $size);
+    }
+
+    /** The <si>/<is> node holding rich-text runs for a cell, if any. */
+    private function richSource(string $sheet, string $ref): ?DOMElement
+    {
+        $cell = $this->findCell($sheet, $ref);
+        if (! $cell) {
+            return null;
+        }
+
+        $xp = $this->xpath($cell->ownerDocument);
+        $type = $cell->getAttribute('t');
+        $node = null;
+
+        if ($type === 's') {
+            $idx = (int) $xp->evaluate('string(m:v)', $cell);
+            $this->sharedStrings();
+            $sst = $this->doc('xl/sharedStrings.xml');
+            $node = $this->xpath($sst)->query('/m:sst/m:si')->item($idx);
+        } elseif ($type === 'inlineStr') {
+            $node = $xp->query('m:is', $cell)->item(0);
+        }
+
+        if ($node instanceof DOMElement && $this->xpath($node->ownerDocument)->query('m:r', $node)->length > 0) {
+            return $node;
+        }
+
+        return null;
     }
 
     /** Set a fixed row height in points. */
