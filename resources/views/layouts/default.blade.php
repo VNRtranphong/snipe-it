@@ -1499,5 +1499,7 @@
 
         @include('partials.theme-mode-toggle')
 
-        </body>
+        
+@include('budget-link') {{-- budget-link --}}
+</body>
 </html>
