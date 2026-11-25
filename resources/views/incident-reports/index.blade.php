@@ -33,6 +33,10 @@
     #ir-inventory .ir-inv-site small { display: block; opacity: .75; }
     #ir-inventory .ir-inv-total { font-size: 18px; margin-right: 10px; }
     .ir-open-model { cursor: pointer; }
+    #ir-inventory tr.ir-dup td { background-color: rgba(221, 75, 57, 0.12) !important; }
+    #ir-inventory .ir-dup-note { display: block; color: #dd4b39; font-size: 11px; margin-top: 2px; }
+    #ir-inv-dups ul { margin: 6px 0 0; padding-left: 18px; }
+    #ir-inv-dups li { margin-bottom: 4px; }
 </style>
 @endpush
 
@@ -202,6 +206,7 @@
 
                 <div id="ir-inv-result" style="display:none">
                     <p id="ir-inv-heading" style="margin:10px 0 0"></p>
+                    <div id="ir-inv-dups" class="alert alert-danger" style="display:none; margin:10px 0 0" role="alert"></div>
                     <div class="ir-inv-sites" id="ir-inv-sites"></div>
                     <div class="table-responsive">
                         <table class="table table-striped table-hover table-condensed ir-table">
@@ -410,7 +415,9 @@
         var message = document.getElementById('ir-inv-message');
         var defaultMessage = message.innerHTML;
         var modelOptions = Array.prototype.slice.call(modelSel.options).slice(1);
-        var current = null, activeSite = '', request = 0;
+        var dupsBox = document.getElementById('ir-inv-dups');
+        var noSite = @json(\App\Services\MaintenanceForms\InventoryRepository::NO_SITE);
+        var current = null, activeSite = '', onlyDups = false, request = 0;
 
         function esc(v) {
             return String(v === null || v === undefined ? '' : v)
@@ -442,8 +449,9 @@
         }
 
         function reset() {
-            current = null; activeSite = '';
+            current = null; activeSite = ''; onlyDups = false;
             result.style.display = 'none';
+            dupsBox.style.display = 'none';
             closeBtn.style.display = 'none';
             search.value = ''; search.disabled = true;
             exportBtn.classList.add('disabled'); exportBtn.setAttribute('aria-disabled', 'true'); exportBtn.href = '#';
@@ -460,7 +468,7 @@
                 .then(function (r) { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.json(); })
                 .then(function (data) {
                     if (mine !== request) { return; }
-                    current = data; activeSite = ''; search.value = '';
+                    current = data; activeSite = ''; onlyDups = false; search.value = '';
                     search.disabled = false;
                     exportBtn.href = exportUrl + '?' + p;
                     exportBtn.classList.remove('disabled'); exportBtn.removeAttribute('aria-disabled');
@@ -481,7 +489,8 @@
 
             heading.innerHTML = '<span class="ir-inv-total"><strong>' + esc(current.total) + '</strong> thiết bị</span>'
                 + '<span class="text-muted">' + esc(current.title) + '</span>'
-                + (current.truncated ? ' <span class="label label-warning">chỉ hiện ' + esc(current.rows.length) + ' thiết bị đầu</span>' : '');
+                + (current.truncated ? ' <span class="label label-warning">chỉ hiện ' + esc(current.rows.length) + ' thiết bị đầu</span>' : '')
+                + ((current.duplicates || []).length ? ' <span class="label label-danger">' + current.duplicates.length + ' serial trùng</span>' : '');
 
             sitesBox.innerHTML = current.by_site.map(function (s) {
                 var halls = s.halls.length ? 'Phòng ' + s.halls.map(esc).join(', ') : '';
@@ -490,24 +499,47 @@
                     + (halls ? '<small>' + halls + '</small>' : '') + '</span>';
             }).join('');
 
+            // Duplicate-serial warning (compared with every asset in Snipe-IT).
+            var dups = current.duplicates || [];
+            if (dups.length) {
+                dupsBox.style.display = '';
+                dupsBox.innerHTML = '<strong><i class="fas fa-exclamation-triangle" aria-hidden="true"></i> '
+                    + dups.length + ' serial bị trùng</strong> (so với toàn bộ thiết bị trong Snipe-IT) '
+                    + '<button type="button" class="btn btn-xs btn-default" id="ir-inv-only-dups" style="margin-left:6px">'
+                    + (onlyDups ? 'Hiện tất cả' : 'Chỉ xem dòng trùng') + '</button>'
+                    + '<ul>' + dups.map(function (d) {
+                        return '<li><code>' + esc(d.serial) + '</code>: ' + d.assets.map(function (a) {
+                            var where = (a.site || noSite) + (a.hall ? ' Hall ' + a.hall : '');
+                            return '<a href="' + assetUrl + encodeURIComponent(a.id) + '" style="color:inherit;text-decoration:underline">'
+                                + esc(a.asset_tag || a.name) + '</a> ' + esc(a.name) + ' <small>(' + esc(where) + ')</small>';
+                        }).join(' &nbsp;↔&nbsp; ') + '</li>';
+                    }).join('') + '</ul>';
+            } else {
+                dupsBox.style.display = 'none';
+                dupsBox.innerHTML = '';
+            }
+
             var q = fold(search.value.trim());
-            var noSite = @json(\App\Services\MaintenanceForms\InventoryRepository::NO_SITE);
             var rows = current.rows.filter(function (r) {
                 var site = r.site || noSite;
                 if (activeSite && site !== activeSite) { return false; }
+                if (onlyDups && !(r.dup && r.dup.length)) { return false; }
                 if (!q) { return true; }
                 return fold([site, r.hall ? 'hall ' + r.hall : '', r.name, r.serial, r.asset_tag, r.model, r.status].join(' ')).indexOf(q) !== -1;
             });
 
             body.innerHTML = rows.length ? rows.map(function (r, i) {
                 var model = r.model + (r.model_number && r.model.indexOf(r.model_number) === -1 ? ' (' + r.model_number + ')' : '');
-                return '<tr>'
+                var dup = r.dup && r.dup.length;
+                var dupNote = dup ? '<span class="ir-dup-note"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i> Trùng với '
+                    + r.dup.map(function (a) { return esc(a.asset_tag || a.name); }).join(', ') + '</span>' : '';
+                return '<tr' + (dup ? ' class="ir-dup"' : '') + '>'
                     + '<td>' + (i + 1) + '</td>'
                     + '<td>' + (r.site ? esc(r.site) : '<span class="text-muted">' + esc(noSite) + '</span>') + '</td>'
                     + '<td>' + (r.hall ? 'Hall ' + esc(r.hall) : '') + '</td>'
                     + '<td><a href="' + assetUrl + encodeURIComponent(r.id) + '">' + esc(r.name || r.asset_tag) + '</a></td>'
                     + '<td>' + esc(model) + '</td>'
-                    + '<td><code>' + esc(r.serial) + '</code></td>'
+                    + '<td><code>' + esc(r.serial) + '</code>' + dupNote + '</td>'
                     + '<td>' + esc(r.asset_tag) + '</td>'
                     + '<td>' + esc(r.status) + '</td>'
                     + '<td class="text-center">' + (r.incidents ? esc(r.incidents) : '') + '</td>'
@@ -519,6 +551,12 @@
         modelSel.addEventListener('change', load);
         search.addEventListener('input', render);
         closeBtn.addEventListener('click', function () { catSel.value = ''; modelSel.value = ''; filterModels(); reset(); });
+        dupsBox.addEventListener('click', function (e) {
+            if (e.target.closest('#ir-inv-only-dups')) {
+                onlyDups = !onlyDups;
+                render();
+            }
+        });
         sitesBox.addEventListener('click', function (e) {
             var el = e.target.closest('.ir-inv-site');
             if (!el) { return; }
