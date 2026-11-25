@@ -89,17 +89,6 @@ class ComponentsController extends Controller
                 break;
         }
 
-        $filter = [];
-
-        if ($request->filled('filter')) {
-            $filter = json_decode($request->input('filter'), true);
-
-            $filter = array_filter($filter, function ($key) use ($allowed_columns) {
-                return in_array($key, $allowed_columns);
-            }, ARRAY_FILTER_USE_KEY);
-
-        }
-
         // This invokes the Searchable model trait scopeTextSearch and will handle input by search or by advanced search filter
         if ($request->filled('filter') || $request->filled('search')) {
             $components->TextSearch($request->input('filter') ? $request->input('filter') : $request->input('search'));
@@ -424,6 +413,16 @@ class ComponentsController extends Controller
 
         if (! $request->filled('ids')) {
             return response()->json(Helper::formatStandardApiResponse('error', null, trans('admin/components/message.bulk.no_components_selected')), 422);
+        }
+
+        // Only a superuser may null the company_id in bulk. For non-
+        // superusers, Company::getIdForCurrentUser() in the single-item
+        // update path coerces a null submission back to the actor's own
+        // company and never allows the field to be cleared. The bulk
+        // null-out loop below unconditionally wipes company_id AFTER the
+        // FMCS validation runs, so this gate has to come up front.
+        if ($request->boolean('null_company_id') && ! auth()->user()->isSuperUser()) {
+            return response()->json(Helper::formatStandardApiResponse('error', null, trans('general.insufficient_permissions')), 422);
         }
 
         $components = Component::whereIn('id', $request->input('ids'))->get();

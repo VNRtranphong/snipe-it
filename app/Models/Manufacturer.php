@@ -77,6 +77,11 @@ class Manufacturer extends SnipeModel implements Importable
      */
     protected $searchableAttributes = [
         'name',
+        'url',
+        'support_url',
+        'support_email',
+        'support_phone',
+        'warranty_lookup_url',
         'created_at',
         'notes',
     ];
@@ -89,6 +94,34 @@ class Manufacturer extends SnipeModel implements Importable
     protected $searchableRelations = [
         'adminuser' => ['first_name', 'last_name', 'display_name'],
     ];
+
+    /**
+     * Advanced-search filterable fields.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function filterableFields(): array
+    {
+        return [
+            [
+                'field' => 'created_by',
+                'type' => 'fk',
+                'column' => 'created_by',
+                'endpoint' => 'users',
+                'label' => trans('general.created_by'),
+            ],
+            [
+                'field' => 'created_at',
+                'type' => 'date-range',
+                'label' => trans('general.created_at'),
+            ],
+            [
+                'field' => 'updated_at',
+                'type' => 'date-range',
+                'label' => trans('general.updated_at'),
+            ],
+        ];
+    }
 
     /**
      * On hard-delete, wipe the image file. Soft-delete leaves it alone so a
@@ -116,6 +149,21 @@ class Manufacturer extends SnipeModel implements Importable
             && (($this->accessories_count ?? $this->accessories()->count()) === 0)
             && (($this->components_count ?? $this->components()->count()) === 0)
             && ($this->deleted_at == '');
+    }
+
+    /**
+     * Whether the sidebar info-panel disclosure for this manufacturer
+     * has anything to reveal. Gates the "+" button so rows with only a
+     * name don't offer an empty expander.
+     */
+    public function hasInfoPanelDetails(): bool
+    {
+        return (bool) ($this->support_phone
+            || $this->support_email
+            || $this->warranty_lookup_url
+            || $this->url
+            || $this->support_url
+            || trim($this->present()->displayAddress()));
     }
 
     public function assets()

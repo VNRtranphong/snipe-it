@@ -19,6 +19,7 @@ use App\Models\Manufacturer;
 use App\Models\Setting;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Traits\LocksLongRunningOperation;
 use Illuminate\Support\Facades\Storage;
 use League\Csv\Reader;
 use Livewire\Attributes\Computed;
@@ -28,6 +29,7 @@ use Livewire\WithPagination;
 
 class Importer extends Component
 {
+    use LocksLongRunningOperation;
     use WithPagination;
 
     // How many import files to show per page. Not currently user-configurable;
@@ -414,6 +416,7 @@ class Importer extends Component
             'image' => trans('general.importer.image_filename'),
             'item_name' => trans('general.item_name_var', ['item' => trans('general.asset')]),
             'location' => trans('general.location'),
+            'default_location' => trans('admin/hardware/form.default_location'),
             'manufacturer' => trans('general.manufacturer'),
             'model_notes' => trans('general.item_notes', ['item' => trans('admin/hardware/form.model')]),
             'model_number' => trans('general.model_no'),
@@ -969,6 +972,27 @@ class Importer extends Component
             return;
         }
 
+        // Per-file mutex. Two admins (or two tabs) trying to process
+        // the SAME file concurrently would double-insert rows and race
+        // the slice index. Different files stay independent because
+        // the key is scoped by file id. The lock persists across all
+        // per-slice API POSTs until stopProcessing() releases it, or
+        // the 30-min TTL expires if the admin abandons the page
+        // mid-run.
+        $file = Import::find($this->activeFileId);
+        if ($file === null) {
+            $this->message = trans('general.file_not_found');
+            $this->message_type = 'danger';
+
+            return;
+        }
+        if (! $this->acquireOperationLock($file->lockKey())) {
+            $this->message = $this->operationAlreadyRunningMessage('general.import');
+            $this->message_type = 'danger';
+
+            return;
+        }
+
         $this->processing = true;
         $this->progress = 0;
         $this->progress_bar_class = 'progress-bar-warning';
@@ -1001,6 +1025,15 @@ class Importer extends Component
     public function stopProcessing(): void
     {
         $this->processing = false;
+
+        // Release the per-file mutex acquired in startProcessing().
+        // Called by the slice-driver JS on either successful completion
+        // or any slice failure, so the lock clears whether the run
+        // finished or bailed early.
+        $file = Import::find($this->activeFileId);
+        if ($file !== null) {
+            $this->releaseOperationLock($file->lockKey());
+        }
     }
 
     /**
@@ -1117,7 +1150,7 @@ class Importer extends Component
         // fieldsets, so a field required in Fieldset A may be irrelevant
         // for rows destined for Fieldset B (issue #19468). Server-side
         // validation on Asset::save() enforces the correct per-asset rule
-        // via customFieldValidationRules() -> $model->fieldset->validation_rules(),
+        // via the resolved custom_fieldset validation rules,
         // which reads the pivot->required flag for the specific fieldset
         // attached to the row's model. Rows that legitimately need the
         // field will still fail at save-time and surface in the import

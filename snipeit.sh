@@ -283,6 +283,9 @@ echo "* Creating MariaDB Database/User."
     chmod -R 775 "$chmod_dir"
   done
 
+  [ -f "$APP_PATH/storage/oauth-public.key" ] && chmod 660 "$APP_PATH/storage/oauth-public.key"
+  [ -f "$APP_PATH/storage/oauth-private.key" ] && chmod 600 "$APP_PATH/storage/oauth-private.key"
+
   chown -R "$APP_USER":"$apache_group" "$APP_PATH"
   chmod 640 "$APP_PATH/.env"
 
@@ -1111,7 +1114,7 @@ EOL
         # Install for CentOS/Alma/Redhat 10
         set_fqdn
         set_dbpass
-        tzone=$(timedatectl | grep "Time zone" | awk 'BEGIN { FS"("}; {print $3}');
+        tzone=$(timedatectl show -p Timezone --value);
 
         echo "* Adding EPEL-release repository."
         log "dnf -y install wget epel-release" & pid=$!
