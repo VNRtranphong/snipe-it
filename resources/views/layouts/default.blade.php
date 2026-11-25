@@ -584,6 +584,14 @@
                                 </a>
                             </li>
 
+                            {{-- Ngân sách & Chi phí: separate app on port 8080 of the same host (same target as the top-bar icon from budget-link.blade.php) --}}
+                            <li>
+                                <a href="{{ 'http://'.request()->getHost().':8080/' }}">
+                                    <i class="fas fa-coins fa-fw" aria-hidden="true"></i>
+                                    <span>Báo cáo Ngân sách &amp; Chi phí</span>
+                                </a>
+                            </li>
+
 
                         @can('view', \App\Models\License::class)
                             <li{!! (request()->is('licenses*') ? ' class="active" aria-current="page"' : '') !!}>

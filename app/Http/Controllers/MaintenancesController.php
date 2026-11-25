@@ -11,7 +11,7 @@ use App\Models\Asset;
 use App\Models\Company;
 use App\Models\Maintenance;
 use App\Models\MaintenanceType;
-use App\Services\MaintenanceForms\MaintenanceFormExporter;
+use App\Services\MaintenanceForms\IncidentDocumentService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -420,25 +420,26 @@ class MaintenancesController extends Controller
      * Download the "Biên bản sự cố kỹ thuật" form (xlsx) pre-filled
      * from this maintenance record.
      */
-    public function exportIncidentReport(Maintenance $maintenance, MaintenanceFormExporter $exporter): BinaryFileResponse
+    public function exportIncidentReport(Maintenance $maintenance, IncidentDocumentService $documents): BinaryFileResponse
     {
         $this->authorize('view', $maintenance->asset);
 
-        [$path, $filename] = $exporter->incidentReport($maintenance);
+        // Same numbering / locked copy as the "Báo cáo sự cố" page.
+        $file = $documents->incident($maintenance);
 
-        return response()->download($path, $filename)->deleteFileAfterSend(true);
+        return response()->download($file['path'], $file['name'])->deleteFileAfterSend($file['temp']);
     }
 
     /**
      * Download the "Maintenance/Services Report - Projection" form (xlsx)
      * pre-filled from this maintenance record.
      */
-    public function exportServiceReport(Maintenance $maintenance, MaintenanceFormExporter $exporter): BinaryFileResponse
+    public function exportServiceReport(Maintenance $maintenance, IncidentDocumentService $documents): BinaryFileResponse
     {
         $this->authorize('view', $maintenance->asset);
 
-        [$path, $filename] = $exporter->serviceReport($maintenance);
+        $file = $documents->service($maintenance);
 
-        return response()->download($path, $filename)->deleteFileAfterSend(true);
+        return response()->download($file['path'], $file['name'])->deleteFileAfterSend($file['temp']);
     }
 }

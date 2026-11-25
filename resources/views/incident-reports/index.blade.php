@@ -24,6 +24,11 @@
     .ir-table .ir-desc { max-width: 380px; white-space: pre-line; font-size: 12px; opacity: .85; }
     .ir-table .ir-dur-overdue { color: #dd4b39; font-weight: 700; }
     .ir-table .ir-actions { white-space: nowrap; }
+    .ir-table .ir-docno { font-size: 12px; white-space: nowrap; }
+    .ir-trend-wrap { position: relative; height: 280px; }
+    .ir-heat th, .ir-heat td { text-align: center; font-size: 12px; padding: 4px 6px !important; }
+    .ir-heat td.ir-heat-site, .ir-heat th.ir-heat-site { text-align: left; white-space: nowrap; }
+    .ir-heat .ir-heat-hidden { display: none; }
     .ir-bulkbar { margin-bottom: 10px; }
     .ir-bulkbar .btn { margin-right: 4px; margin-bottom: 4px; }
     #ir-inventory .ir-inv-sites { margin: 8px 0 12px; }
@@ -166,6 +171,66 @@
             </div>
         </div>
 
+        {{-- ====== Xu hướng 12 tháng ====== --}}
+        @php
+            $heatMax = 0;
+            foreach ($trend['sites'] as $ts) { $heatMax = max($heatMax, max($ts['counts'] ?: [0])); }
+            $heatTop = 15;
+        @endphp
+        <div class="box box-default" id="ir-trend">
+            <div class="box-header with-border">
+                <h2 class="box-title"><i class="fas fa-chart-line" aria-hidden="true"></i>
+                    Xu hướng 12 tháng ({{ $trend['labels'][0] }} – {{ end($trend['labels']) }})
+                </h2>
+                <div class="box-tools pull-right">
+                    <button type="button" class="btn btn-box-tool" data-widget="collapse" aria-label="Thu gọn"><i class="fas fa-minus" aria-hidden="true"></i></button>
+                </div>
+            </div>
+            <div class="box-body">
+                <p class="text-muted" style="font-size:12px; margin-top:0">
+                    Theo site / hall / loại thiết bị / ô tìm đang lọc, tính theo tháng của ngày bắt đầu sự cố.
+                    Đổi "Đến ngày" để dời mốc 12 tháng.
+                </p>
+                <div class="ir-trend-wrap"><canvas id="ir-trend-chart" aria-label="Biểu đồ số sự cố và suất hủy theo tháng" role="img"></canvas></div>
+
+                @if (count($trend['sites']))
+                    <h4 style="margin-top:18px">Số sự cố theo rạp × tháng</h4>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-condensed ir-heat">
+                            <thead>
+                                <tr>
+                                    <th class="ir-heat-site">Rạp</th>
+                                    @foreach ($trend['labels'] as $lbl)
+                                        <th>{{ $lbl }}</th>
+                                    @endforeach
+                                    <th>Tổng</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($trend['sites'] as $i => $ts)
+                                    <tr class="{{ $i >= $heatTop ? 'ir-heat-hidden' : '' }}">
+                                        <td class="ir-heat-site">
+                                            <a href="{{ route('incident-reports.index', ['site' => $ts['site'], 'from' => $filters['from']->format('Y-m-d'), 'to' => $filters['to']->format('Y-m-d')]) }}">{{ $ts['site'] }}</a>
+                                        </td>
+                                        @foreach ($ts['counts'] as $c)
+                                            @php $alpha = $heatMax > 0 && $c > 0 ? round(0.12 + 0.68 * $c / $heatMax, 2) : 0; @endphp
+                                            <td style="{{ $c > 0 ? 'background-color: rgba(221,75,57,'.$alpha.');'.($alpha > 0.5 ? 'color:#fff;font-weight:600;' : '') : '' }}">{{ $c ?: '' }}</td>
+                                        @endforeach
+                                        <td><strong>{{ $ts['total'] }}</strong></td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (count($trend['sites']) > $heatTop)
+                        <button type="button" class="btn btn-default btn-xs" id="ir-heat-more">Xem tất cả {{ count($trend['sites']) }} rạp</button>
+                    @endif
+                @else
+                    <p class="text-muted">Chưa có sự cố nào trong 12 tháng này.</p>
+                @endif
+            </div>
+        </div>
+
         {{-- ====== Tra cứu thiết bị ====== --}}
         <div class="box box-default" id="ir-inventory">
             <div class="box-header with-border">
@@ -278,6 +343,7 @@
                                     <th class="text-center">Suất hủy</th>
                                     <th>Phụ trách</th>
                                     <th>Trạng thái</th>
+                                    <th>Biên bản</th>
                                     <th class="text-right">Xuất</th>
                                 </tr>
                             </thead>
@@ -324,7 +390,33 @@
                                             <br><span class="label label-danger">Quá {{ $overdueHours }}h</span>
                                         @endif
                                     </td>
+                                    @php $doc = $docs[$r['id']] ?? null; @endphp
+                                    <td class="ir-docno">
+                                        @if ($doc)
+                                            {{ $doc->number }}
+                                            @if ($doc->locked_at)
+                                                <br><span class="label label-default" title="Tải về sẽ ra đúng bản đã chốt">
+                                                    <i class="fas fa-lock" aria-hidden="true"></i> Đã chốt {{ \Carbon\Carbon::parse($doc->locked_at)->format('d/m/Y') }}
+                                                </span>
+                                            @endif
+                                        @else
+                                            <span class="text-muted" title="Số được cấp ở lần xuất BBSC đầu tiên">chưa cấp số</span>
+                                        @endif
+                                    </td>
                                     <td class="text-right ir-actions">
+                                        @if ($doc && $doc->locked_at)
+                                            @if ($canUnlock)
+                                                <button type="submit" formaction="{{ route('incident-reports.unlock', $r['id']) }}" class="btn btn-sm btn-default ir-confirm"
+                                                        data-confirm="Mở chốt biên bản {{ $doc->number }}? Lần tải sau sẽ tạo lại từ dữ liệu hiện tại." data-tooltip="true" title="Mở chốt (admin)">
+                                                    <i class="fas fa-lock-open fa-fw" aria-hidden="true"></i><span class="sr-only">Mở chốt</span>
+                                                </button>
+                                            @endif
+                                        @elseif ($canLock)
+                                            <button type="submit" formaction="{{ route('incident-reports.lock', $r['id']) }}" class="btn btn-sm btn-default ir-confirm"
+                                                    data-confirm="Chốt biên bản cho sự cố &quot;{{ $r['name'] }}&quot;? Sau khi chốt, tải về luôn ra bản này dù phiếu có bị sửa." data-tooltip="true" title="Chốt biên bản">
+                                                <i class="fas fa-lock fa-fw" aria-hidden="true"></i><span class="sr-only">Chốt</span>
+                                            </button>
+                                        @endif
                                         <a href="{{ route('incident-reports.incident', $r['id']) }}" class="btn btn-sm bg-orange" data-tooltip="true" title="Xuất biên bản sự cố">
                                             <i class="fas fa-exclamation-triangle fa-fw" aria-hidden="true"></i><span class="sr-only">BBSC</span>
                                         </a>
@@ -334,7 +426,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="10" class="text-center text-muted" style="padding:24px">Không có sự cố nào khớp bộ lọc.</td></tr>
+                                <tr><td colspan="11" class="text-center text-muted" style="padding:24px">Không có sự cố nào khớp bộ lọc.</td></tr>
                             @endforelse
                             </tbody>
                         </table>
@@ -348,7 +440,65 @@
 @stop
 
 @section('moar_scripts')
+<script src="{{ url(mix('js/dist/Chart.min.js')) }}"></script>
 <script nonce="{{ csrf_token() }}">
+    // ====== Chốt / mở chốt: confirm ======
+    (function () {
+        Array.prototype.forEach.call(document.querySelectorAll('.ir-confirm'), function (btn) {
+            btn.addEventListener('click', function (e) {
+                if (!window.confirm(btn.getAttribute('data-confirm'))) { e.preventDefault(); }
+            });
+        });
+    })();
+
+    // ====== Xu hướng 12 tháng ======
+    (function () {
+        var trend = @json($trend);
+        var more = document.getElementById('ir-heat-more');
+        if (more) {
+            more.addEventListener('click', function () {
+                Array.prototype.forEach.call(document.querySelectorAll('.ir-heat-hidden'), function (tr) { tr.classList.remove('ir-heat-hidden'); });
+                more.style.display = 'none';
+            });
+        }
+
+        var canvas = document.getElementById('ir-trend-chart');
+        if (!canvas || typeof Chart === 'undefined') { return; }
+        var dark = (typeof isDark === 'function') && isDark();
+        var fg = dark ? '#cccccc' : '#666666';
+        var grid = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+        Chart.defaults.global.defaultFontColor = fg;
+
+        new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: trend.labels,
+                datasets: [
+                    { type: 'line', label: 'Suất bị hủy', data: trend.cancelled, yAxisID: 'shows',
+                      borderColor: '#605ca8', backgroundColor: 'rgba(96,92,168,0.15)', pointBackgroundColor: '#605ca8',
+                      borderWidth: 2, fill: false, lineTension: 0.2 },
+                    { label: 'Số sự cố', data: trend.incidents, yAxisID: 'count', backgroundColor: 'rgba(60,141,188,0.85)' },
+                    { label: 'Trong đó quá 24h', data: trend.overdue, yAxisID: 'count', backgroundColor: 'rgba(221,75,57,0.85)' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                legend: { position: 'bottom' },
+                tooltips: { mode: 'index', intersect: false },
+                scales: {
+                    xAxes: [{ gridLines: { color: grid } }],
+                    yAxes: [
+                        { id: 'count', position: 'left', ticks: { beginAtZero: true, precision: 0 },
+                          scaleLabel: { display: true, labelString: 'Số sự cố' }, gridLines: { color: grid } },
+                        { id: 'shows', position: 'right', ticks: { beginAtZero: true, precision: 0 },
+                          scaleLabel: { display: true, labelString: 'Suất bị hủy' }, gridLines: { drawOnChartArea: false } }
+                    ]
+                }
+            }
+        });
+    })();
+
     (function () {
         // Month picker fills the from/to dates and submits.
         var month = document.getElementById('ir-month');

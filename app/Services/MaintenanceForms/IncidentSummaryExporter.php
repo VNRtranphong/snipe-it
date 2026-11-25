@@ -33,7 +33,7 @@ class IncidentSummaryExporter
         $subtitle = 'Thời gian: '.$period.'  |  '.implode(' · ', $scope).'  |  Xuất lúc '.Carbon::now()->format('d/m/Y H:i');
 
         $headers = [
-            'STT', 'Bắt đầu', 'Hoàn thành', 'Site', 'Hall', 'Loại TB', 'Thiết bị', 'Model', 'Serial', 'Mã TS',
+            'STT', 'Số biên bản', 'Bắt đầu', 'Hoàn thành', 'Site', 'Hall', 'Loại TB', 'Thiết bị', 'Model', 'Serial', 'Mã TS',
             'Sự cố', 'Mô tả / Ghi chú', 'Part / Loại', 'Bảo hành', 'Người phụ trách',
             'Thời gian xử lý (giờ)', 'Thời gian xử lý', 'Quá 24h', 'Số suất hủy', 'Trạng thái',
         ];
@@ -43,6 +43,7 @@ class IncidentSummaryExporter
         foreach ($rows as $i => $r) {
             $data[] = [
                 $i + 1,
+                ($r['doc_number'] ?? '').(! empty($r['doc_locked']) ? ' (đã chốt)' : ''),
                 self::dt($r['start_at'] ?? null),
                 self::dt($r['completed_at_dt'] ?? null),
                 $r['site'],
@@ -71,16 +72,16 @@ class IncidentSummaryExporter
         $stats = IncidentReportRepository::stats($rows);
         $total = array_fill(0, count($headers), null);
         $total[0] = 'Tổng';
-        $total[10] = $stats['total'].' sự cố';
-        $total[17] = $stats['overdue'];
-        $total[18] = $stats['cancelled'];
-        $total[19] = $stats['open'].' đang xử lý';
+        $total[11] = $stats['total'].' sự cố';
+        $total[18] = $stats['overdue'];
+        $total[19] = $stats['cancelled'];
+        $total[20] = $stats['open'].' đang xử lý';
 
         $writer = new SimpleXlsxWriter;
         $writer->addSheet('Danh sách sự cố', $headers, $data, [
             'title' => 'TỔNG HỢP SỰ CỐ KỸ THUẬT',
             'subtitle' => $subtitle,
-            'widths' => [5, 16, 16, 18, 6, 11, 28, 18, 16, 12, 24, 45, 14, 9, 18, 11, 15, 8, 9, 12],
+            'widths' => [5, 26, 16, 16, 18, 6, 11, 28, 18, 16, 12, 24, 45, 14, 9, 18, 11, 15, 8, 9, 12],
             'rowStyles' => $styles,
             'totalRow' => $rows ? $total : null,
         ]);

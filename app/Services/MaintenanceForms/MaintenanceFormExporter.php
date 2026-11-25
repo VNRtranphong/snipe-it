@@ -71,10 +71,14 @@ class MaintenanceFormExporter
         $this->templatePath ??= resource_path('templates/maintenances/Form_BBSC.xlsx');
     }
 
-    /** @return array{0: string, 1: string} [temp file path, download filename] */
-    public function incidentReport(Maintenance $maintenance): array
+    /**
+     * @param  string|null  $number  official number from IncidentDocumentService (e.g. "HTP-03.12/01/2026-BBSC")
+     * @return array{0: string, 1: string} [temp file path, download filename]
+     */
+    public function incidentReport(Maintenance $maintenance, ?string $number = null): array
     {
         $data = self::collect($maintenance);
+        $data['doc_number'] = $number;
         $path = $this->tempPath();
         $this->fillIncident($data, $path);
 
@@ -239,8 +243,7 @@ class MaintenanceFormExporter
         $s = self::SHEET_INCIDENT;
         $x = new XlsxTemplateFiller($this->templatePath, $outputPath);
 
-        $docDate = $d['start_date'] ?: Carbon::now()->format('d/m/Y');
-        $x->setCell($s, 'A3', sprintf('Số: %s-%02d.%s-BBSC', self::siteCode($d['site']), $d['id'], $docDate));
+        $x->setCell($s, 'A3', 'Số: '.(! empty($d['doc_number']) ? $d['doc_number'] : self::draftNumber($d)));
 
         // I. Thiết bị
         $x->tick($s, self::equipmentBox($d));
@@ -355,6 +358,23 @@ class MaintenanceFormExporter
         }
 
         return $model;
+    }
+
+    /**
+     * Official number: <site code>-<seq>.<start date>-BBSC, seq padded to 2.
+     * e.g. "HTP-03.12/01/2026-BBSC".
+     */
+    public static function formatNumber(string $siteCode, int $seq, string $date): string
+    {
+        return sprintf('%s-%02d.%s-BBSC', $siteCode, $seq, $date);
+    }
+
+    /** Used only when no official number was given (e.g. unit tests). */
+    private static function draftNumber(array $d): string
+    {
+        $docDate = $d['start_date'] ?: Carbon::now()->format('d/m/Y');
+
+        return self::formatNumber(self::siteCode($d['site']), (int) $d['id'], $docDate);
     }
 
     /** "Huỳnh Tấn Phát" => "HTP", "Nguyễn Du" => "ND". */

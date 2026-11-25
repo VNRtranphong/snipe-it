@@ -288,6 +288,10 @@ Route::group(['prefix' => 'incident-reports', 'middleware' => ['auth']], functio
         ->name('incident-reports.incident');
     Route::get('{maintenance}/service-report', [IncidentReportsController::class, 'service'])
         ->name('incident-reports.service');
+    Route::post('{maintenance}/lock', [IncidentReportsController::class, 'lock'])
+        ->name('incident-reports.lock');
+    Route::post('{maintenance}/unlock', [IncidentReportsController::class, 'unlock'])
+        ->name('incident-reports.unlock');
 });
 
 Route::post('maintenances/bulk',

@@ -76,7 +76,7 @@ class IncidentReportRepository
      * @param  array{from: Carbon, to: Carbon}  $f
      * @return list<array<string, mixed>>
      */
-    public function rowsInRange(array $f, ?Carbon $now = null): array
+    public function rowsInRange(array $f, ?Carbon $now = null, bool $includeOpenBefore = true, ?int $limit = null): array
     {
         $now ??= Carbon::now();
 
@@ -92,14 +92,16 @@ class IncidentReportRepository
                 'responsibleParty',
                 'adminuser',
             ])
-            ->where(function ($q) use ($f) {
-                $q->whereBetween('start_date', [$f['from'], $f['to']])
-                    ->orWhere(function ($open) use ($f) {
+            ->where(function ($q) use ($f, $includeOpenBefore) {
+                $q->whereBetween('start_date', [$f['from'], $f['to']]);
+                if ($includeOpenBefore) {
+                    $q->orWhere(function ($open) use ($f) {
                         $open->whereNull('completed_at')->where('start_date', '<', $f['from']);
                     });
+                }
             })
             ->orderByDesc('start_date')
-            ->limit(self::MAX_ROWS)
+            ->limit($limit ?? self::MAX_ROWS)
             ->get();
 
         $rows = [];
@@ -256,6 +258,63 @@ class IncidentReportRepository
         ));
 
         return ['sites' => array_values($sites), 'halls' => array_values(array_map('strval', $halls)), 'equipment' => $equipment];
+    }
+
+    /**
+     * Month-by-month numbers for the trend chart.
+     *
+     * @param  list<array<string, mixed>>  $rows  decorated rows (already filtered)
+     * @return array{labels: list<string>, keys: list<string>, incidents: list<int>, cancelled: list<int>, overdue: list<int>,
+     *               sites: list<array{site: string, counts: list<int>, total: int}>}
+     */
+    public static function trend(array $rows, Carbon $endMonth, int $months = 12): array
+    {
+        $keys = [];
+        $labels = [];
+        $cursor = $endMonth->copy()->startOfMonth();
+        for ($i = $months - 1; $i >= 0; $i--) {
+            $m = (clone $cursor)->modify('-'.$i.' month');
+            $keys[] = $m->format('Y-m');
+            $labels[] = $m->format('m/Y');
+        }
+        $index = array_flip($keys);
+
+        $incidents = array_fill(0, $months, 0);
+        $cancelled = array_fill(0, $months, 0);
+        $overdue = array_fill(0, $months, 0);
+        $sites = [];
+
+        foreach ($rows as $r) {
+            $start = $r['start_at'] ?? null;
+            if (! $start instanceof Carbon) {
+                continue;
+            }
+            $k = $start->format('Y-m');
+            if (! isset($index[$k])) {
+                continue;
+            }
+            $i = $index[$k];
+            $incidents[$i]++;
+            $cancelled[$i] += (int) $r['cancelled_count'];
+            $overdue[$i] += $r['overdue'] ? 1 : 0;
+
+            $site = $r['site'] !== '' ? $r['site'] : '(Chưa rõ site)';
+            $sites[$site] ??= ['site' => $site, 'counts' => array_fill(0, $months, 0), 'total' => 0];
+            $sites[$site]['counts'][$i]++;
+            $sites[$site]['total']++;
+        }
+
+        // Busiest sites first; ties by name.
+        uasort($sites, fn ($a, $b) => $b['total'] <=> $a['total'] ?: strnatcasecmp($a['site'], $b['site']));
+
+        return [
+            'labels' => $labels,
+            'keys' => $keys,
+            'incidents' => $incidents,
+            'cancelled' => $cancelled,
+            'overdue' => $overdue,
+            'sites' => array_values($sites),
+        ];
     }
 
     /** "2 ngày 5 giờ", "5 giờ 30 phút", "45 phút". */

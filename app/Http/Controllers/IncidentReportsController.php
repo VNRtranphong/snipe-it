@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Asset;
 use App\Models\AssetModel;
 use App\Models\Category;
 use App\Models\Maintenance;
+use App\Services\MaintenanceForms\IncidentDocumentService;
 use App\Services\MaintenanceForms\IncidentReportRepository;
 use App\Services\MaintenanceForms\IncidentSummaryExporter;
 use App\Services\MaintenanceForms\InventoryRepository;
-use App\Services\MaintenanceForms\MaintenanceFormExporter;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -32,7 +33,7 @@ class IncidentReportsController extends Controller
 {
     public function __construct(
         private IncidentReportRepository $repository,
-        private MaintenanceFormExporter $exporter,
+        private IncidentDocumentService $documents,
     ) {
         parent::__construct();
     }
@@ -49,9 +50,15 @@ class IncidentReportsController extends Controller
             ? $rows
             : IncidentReportRepository::applyFilters($inRange, ['status' => ''] + $filters);
 
+        $user = $request->user();
+
         return view('incident-reports.index', [
             'filters' => $filters,
             'rows' => $rows,
+            'docs' => $this->documents->findMany(array_map(fn ($r) => (int) $r['id'], $rows)),
+            'canLock' => $user?->can('update', Asset::class) ?? false,
+            'canUnlock' => (bool) $user?->isSuperUser(),
+            'trend' => $this->trendFor($filters),
             'stats' => IncidentReportRepository::stats($forStats),
             'options' => IncidentReportRepository::options($inRange, $filters['site']),
             'truncated' => count($inRange) >= IncidentReportRepository::MAX_ROWS,
@@ -62,20 +69,70 @@ class IncidentReportsController extends Controller
         ]);
     }
 
-    /** Single BBSC download (no asset permission needed on this page). */
+    /**
+     * Single BBSC download (no asset permission needed on this page).
+     * Issues the official number on first export; returns the locked file
+     * once the biên bản has been "chốt".
+     */
     public function incident(Maintenance $maintenance): BinaryFileResponse
     {
-        [$path, $name] = $this->exporter->incidentReport($maintenance);
-
-        return response()->download($path, $name)->deleteFileAfterSend(true);
+        return self::send($this->documents->incident($maintenance));
     }
 
-    /** Single Service Report download. */
+    /** Single Service Report download (locked copy if chốt). */
     public function service(Maintenance $maintenance): BinaryFileResponse
     {
-        [$path, $name] = $this->exporter->serviceReport($maintenance);
+        return self::send($this->documents->service($maintenance));
+    }
 
-        return response()->download($path, $name)->deleteFileAfterSend(true);
+    /** Chốt biên bản: snapshot BBSC + Service Report. Needs asset edit rights. */
+    public function lock(Request $request, Maintenance $maintenance): RedirectResponse
+    {
+        $this->authorize('update', Asset::class);
+
+        try {
+            $doc = $this->documents->lock($maintenance, $request->user()?->id);
+        } catch (\Throwable $e) {
+            Log::error('Incident lock failed for maintenance '.$maintenance->id.': '.$e->getMessage());
+
+            return redirect()->back()->with('error', 'Không chốt được biên bản: '.$e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Đã chốt biên bản '.$doc->number.'. Từ giờ tải về sẽ ra đúng bản đã chốt.');
+    }
+
+    /** Mở chốt: superusers only. The number is kept. */
+    public function unlock(Request $request, Maintenance $maintenance): RedirectResponse
+    {
+        abort_unless((bool) $request->user()?->isSuperUser(), 403);
+
+        $this->documents->unlock((int) $maintenance->id);
+
+        return redirect()->back()->with('success', 'Đã mở chốt biên bản. Bản đã chốt trước đó được lưu lại trong thư mục _unlocked.');
+    }
+
+    /** @param array{path: string, name: string, temp: bool} $file */
+    private static function send(array $file): BinaryFileResponse
+    {
+        return response()->download($file['path'], $file['name'])->deleteFileAfterSend($file['temp']);
+    }
+
+    /**
+     * 12 months ending with the month of the "to" date, same site / hall /
+     * equipment / search filters as the list (status ignored).
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function trendFor(array $filters): array
+    {
+        $end = $filters['to']->copy()->endOfMonth();
+        $start = $filters['to']->copy()->startOfMonth()->subMonths(11);
+
+        $rows = $this->repository->rowsInRange(['from' => $start, 'to' => $end] + $filters, null, false, 10000);
+        $rows = IncidentReportRepository::applyFilters($rows, ['status' => ''] + $filters);
+
+        return IncidentReportRepository::trend($rows, $end, 12);
     }
 
     /**
@@ -114,21 +171,24 @@ class IncidentReportsController extends Controller
         foreach ($maintenances as $m) {
             $jobs = [];
             if ($type !== 'report') {
-                $jobs[] = ['BBSC', fn () => $this->exporter->incidentReport($m)];
+                $jobs[] = ['BBSC', fn () => $this->documents->incident($m)];
             }
             if ($type !== 'bbsc') {
-                $jobs[] = ['Service Report', fn () => $this->exporter->serviceReport($m)];
+                $jobs[] = ['Service Report', fn () => $this->documents->service($m)];
             }
 
             foreach ($jobs as [$folder, $make]) {
                 try {
-                    [$path, $name] = $make();
+                    $file = $make();
                 } catch (\Throwable $e) {
                     Log::warning('Incident export failed for maintenance '.$m->id.': '.$e->getMessage());
 
                     continue;
                 }
-                $temp[] = $path;
+                [$path, $name] = [$file['path'], $file['name']];
+                if ($file['temp']) {
+                    $temp[] = $path;
+                }
                 $entry = $folder.'/'.$name;
                 if (isset($used[$entry])) {
                     $entry = $folder.'/'.pathinfo($name, PATHINFO_FILENAME).'_'.$m->id.'.xlsx';
@@ -156,6 +216,14 @@ class IncidentReportsController extends Controller
     {
         $filters = IncidentReportRepository::filters($request->query(), $request->user());
         $rows = IncidentReportRepository::applyFilters($this->repository->rowsInRange($filters), $filters);
+
+        $docs = $this->documents->findMany(array_map(fn ($r) => (int) $r['id'], $rows));
+        foreach ($rows as &$r) {
+            $doc = $docs[(int) $r['id']] ?? null;
+            $r['doc_number'] = $doc?->number ?? '';
+            $r['doc_locked'] = (bool) ($doc?->locked_at);
+        }
+        unset($r);
 
         // Oldest first reads better in a report.
         usort($rows, fn ($a, $b) => ($a['start_at']?->getTimestamp() ?? 0) <=> ($b['start_at']?->getTimestamp() ?? 0));
