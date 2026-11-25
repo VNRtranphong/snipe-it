@@ -131,6 +131,9 @@ class MaintenanceFormExporter
             'technician' => (string) $technician,
             'asset_name' => (string) ($asset?->name ?? ''),
             'asset_tag' => (string) ($asset?->asset_tag ?? ''),
+            'asset_id' => $asset?->id,
+            'model_id' => $asset?->model_id,
+            'category_id' => $asset?->model?->category_id,
             'serial' => (string) ($asset?->serial ?? ''),
             'model' => (string) ($asset?->model?->name ?? ''),
             'model_number' => (string) ($asset?->model?->model_number ?? ''),
@@ -151,7 +154,7 @@ class MaintenanceFormExporter
      *
      * @return array{0: string, 1: string}
      */
-    private static function siteAndHall(?Asset $asset): array
+    public static function siteAndHall(?Asset $asset): array
     {
         if (! $asset) {
             return ['', ''];

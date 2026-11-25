@@ -278,6 +278,10 @@ Route::group(['prefix' => 'incident-reports', 'middleware' => ['auth']], functio
         );
     Route::get('summary', [IncidentReportsController::class, 'summary'])
         ->name('incident-reports.summary');
+    Route::get('inventory', [IncidentReportsController::class, 'inventory'])
+        ->name('incident-reports.inventory');
+    Route::get('inventory/export', [IncidentReportsController::class, 'inventoryExport'])
+        ->name('incident-reports.inventory.export');
     Route::post('bulk', [IncidentReportsController::class, 'bulk'])
         ->name('incident-reports.bulk');
     Route::get('{maintenance}/incident-report', [IncidentReportsController::class, 'incident'])

@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AssetModel;
+use App\Models\Category;
 use App\Models\Maintenance;
 use App\Services\MaintenanceForms\IncidentReportRepository;
 use App\Services\MaintenanceForms\IncidentSummaryExporter;
+use App\Services\MaintenanceForms\InventoryRepository;
 use App\Services\MaintenanceForms\MaintenanceFormExporter;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -46,6 +50,9 @@ class IncidentReportsController extends Controller
             'options' => IncidentReportRepository::options($inRange, $filters['site']),
             'truncated' => count($inRange) >= IncidentReportRepository::MAX_ROWS,
             'overdueHours' => IncidentReportRepository::OVERDUE_HOURS,
+            // Tra cứu thiết bị
+            'inventoryCategories' => Category::where('category_type', 'asset')->orderBy('name')->get(['id', 'name']),
+            'inventoryModels' => AssetModel::orderBy('name')->get(['id', 'name', 'model_number', 'category_id']),
         ]);
     }
 
@@ -154,5 +161,33 @@ class IncidentReportsController extends Controller
         $name = 'TongHopSuCo'.$sitePart.'_'.$filters['from']->format('d-m-Y').'_'.$filters['to']->format('d-m-Y').'.xlsx';
 
         return response()->download($path, $name)->deleteFileAfterSend(true);
+    }
+
+    /** Tra cứu thiết bị: JSON for the inventory panel. */
+    public function inventory(Request $request, InventoryRepository $inventory): JsonResponse
+    {
+        return response()->json($inventory->lookup(
+            $request->integer('category_id') ?: null,
+            $request->integer('model_id') ?: null,
+        ));
+    }
+
+    /** Tra cứu thiết bị: Excel download of the same lookup. */
+    public function inventoryExport(Request $request, InventoryRepository $inventory): BinaryFileResponse|RedirectResponse
+    {
+        $result = $inventory->lookup(
+            $request->integer('category_id') ?: null,
+            $request->integer('model_id') ?: null,
+        );
+        if ($result['title'] === '') {
+            return redirect()->route('incident-reports.index')->with('error', 'Chưa chọn Category hoặc Model.');
+        }
+
+        $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'inventory_'.Str::random(16).'.xlsx';
+        InventoryRepository::export($result, $path);
+
+        return response()
+            ->download($path, 'ThietBi_'.Str::slug($result['title']).'_'.Carbon::now()->format('d-m-Y').'.xlsx')
+            ->deleteFileAfterSend(true);
     }
 }
