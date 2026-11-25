@@ -56,14 +56,21 @@ class IncidentReportsController extends Controller
             'filters' => $filters,
             'rows' => $rows,
             'docs' => $this->documents->findMany(array_map(fn ($r) => (int) $r['id'], $rows)),
-            'canLock' => $user?->can('update', Asset::class) ?? false,
+            'docsReady' => $this->documents->ready(),
+            'canLock' => ($user?->can('update', Asset::class) ?? false) && $this->documents->ready(),
             'canUnlock' => (bool) $user?->isSuperUser(),
             'trend' => $this->trendFor($filters),
             'stats' => IncidentReportRepository::stats($forStats),
             'options' => IncidentReportRepository::options($inRange, $filters['site']),
             'truncated' => count($inRange) >= IncidentReportRepository::MAX_ROWS,
             'overdueHours' => IncidentReportRepository::OVERDUE_HOURS,
-            // Tra cứu thiết bị
+        ]);
+    }
+
+    /** Tra cứu thiết bị: separate page (data comes from inventory()). */
+    public function inventoryPage(): View
+    {
+        return view('incident-reports.inventory', [
             'inventoryCategories' => Category::where('category_type', 'asset')->orderBy('name')->get(['id', 'name']),
             'inventoryModels' => AssetModel::orderBy('name')->get(['id', 'name', 'model_number', 'category_id']),
         ]);

@@ -294,6 +294,14 @@ Route::group(['prefix' => 'incident-reports', 'middleware' => ['auth']], functio
         ->name('incident-reports.unlock');
 });
 
+// Tra cứu thiết bị theo Model / Category (open to every logged-in user).
+Route::get('equipment-lookup', [IncidentReportsController::class, 'inventoryPage'])
+    ->name('equipment-lookup.index')
+    ->middleware(['auth'])
+    ->breadcrumbs(fn (Trail $trail) => $trail->parent('home', route('home'))
+        ->push('Tra cứu thiết bị', route('equipment-lookup.index'))
+    );
+
 Route::post('maintenances/bulk',
     [BulkMaintenancesController::class, 'store']
 )->name('maintenances.bulk')->middleware(['auth']);

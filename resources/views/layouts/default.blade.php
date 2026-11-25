@@ -592,6 +592,14 @@
                                 </a>
                             </li>
 
+                            {{-- Tra cứu thiết bị theo Model / Category --}}
+                            <li{!! (request()->is('equipment-lookup*') ? ' class="active" aria-current="page"' : '') !!}>
+                                <a href="{{ route('equipment-lookup.index') }}">
+                                    <i class="fas fa-boxes fa-fw" aria-hidden="true"></i>
+                                    <span>Tra cứu thiết bị</span>
+                                </a>
+                            </li>
+
 
                         @can('view', \App\Models\License::class)
                             <li{!! (request()->is('licenses*') ? ' class="active" aria-current="page"' : '') !!}>

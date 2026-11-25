@@ -7,6 +7,8 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 /**
@@ -28,11 +30,37 @@ class IncidentDocumentService
 {
     public const TABLE = 'incident_report_documents';
 
+    private ?bool $ready = null;
+
     public function __construct(private MaintenanceFormExporter $exporter) {}
+
+    /**
+     * False until `php artisan migrate` has created the table. Everything
+     * below degrades gracefully instead of throwing a 500.
+     */
+    public function ready(): bool
+    {
+        if ($this->ready === null) {
+            try {
+                $this->ready = Schema::hasTable(self::TABLE);
+            } catch (\Throwable $e) {
+                $this->ready = false;
+            }
+            if (! $this->ready) {
+                Log::warning('Bảng '.self::TABLE.' chưa có – hãy chạy: php artisan migrate');
+            }
+        }
+
+        return $this->ready;
+    }
 
     /** Stored row for one maintenance, or null. */
     public function find(int $maintenanceId): ?object
     {
+        if (! $this->ready()) {
+            return null;
+        }
+
         return DB::table(self::TABLE)->where('maintenance_id', $maintenanceId)->first();
     }
 
@@ -44,7 +72,7 @@ class IncidentDocumentService
      */
     public function findMany(array $ids): array
     {
-        if (! $ids) {
+        if (! $ids || ! $this->ready()) {
             return [];
         }
 
@@ -61,8 +89,13 @@ class IncidentDocumentService
     /**
      * The official number of a maintenance, issuing the next one if needed.
      */
-    public function numberFor(Maintenance $maintenance): string
+    public function numberFor(Maintenance $maintenance): ?string
     {
+        // Table missing: fall back to the old ID-based draft number.
+        if (! $this->ready()) {
+            return null;
+        }
+
         if ($existing = $this->find((int) $maintenance->id)) {
             return $existing->number;
         }
@@ -153,6 +186,10 @@ class IncidentDocumentService
      */
     public function lock(Maintenance $maintenance, ?int $userId): object
     {
+        if (! $this->ready()) {
+            throw new RuntimeException('Chưa chạy "php artisan migrate" trên server nên chưa chốt được.');
+        }
+
         $number = $this->numberFor($maintenance);
         $doc = $this->find((int) $maintenance->id);
         if ($doc->locked_at) {
