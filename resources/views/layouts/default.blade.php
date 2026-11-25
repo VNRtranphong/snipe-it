@@ -576,6 +576,14 @@
                                 </li>
                             @endif
 
+                            {{-- Báo cáo sự cố: visible to every logged-in user --}}
+                            <li{!! (request()->is('incident-reports*') ? ' class="active" aria-current="page"' : '') !!}>
+                                <a href="{{ route('incident-reports.index') }}">
+                                    <i class="fas fa-exclamation-triangle fa-fw" aria-hidden="true"></i>
+                                    <span>Báo cáo sự cố</span>
+                                </a>
+                            </li>
+
 
                         @can('view', \App\Models\License::class)
                             <li{!! (request()->is('licenses*') ? ' class="active" aria-current="page"' : '') !!}>

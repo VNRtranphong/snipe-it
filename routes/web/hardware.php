@@ -5,6 +5,7 @@ use App\Http\Controllers\Assets\AssetCheckoutController;
 use App\Http\Controllers\Assets\AssetsController;
 use App\Http\Controllers\Assets\BulkAssetsController;
 use App\Http\Controllers\BulkMaintenancesController;
+use App\Http\Controllers\IncidentReportsController;
 use App\Http\Controllers\MaintenancesController;
 use App\Models\Asset;
 use App\Models\Maintenance;
@@ -266,6 +267,24 @@ Route::get('maintenances/{maintenance}/export/incident-report',
 Route::get('maintenances/{maintenance}/export/service-report',
     [MaintenancesController::class, 'exportServiceReport']
 )->name('maintenances.export.service')->middleware(['auth']);
+
+// Báo cáo sự cố: read-only incident list + BBSC / Service Report exports.
+// Open to every logged-in user on purpose (only the auth middleware).
+Route::group(['prefix' => 'incident-reports', 'middleware' => ['auth']], function () {
+    Route::get('/', [IncidentReportsController::class, 'index'])
+        ->name('incident-reports.index')
+        ->breadcrumbs(fn (Trail $trail) => $trail->parent('home', route('home'))
+            ->push('Báo cáo sự cố', route('incident-reports.index'))
+        );
+    Route::get('summary', [IncidentReportsController::class, 'summary'])
+        ->name('incident-reports.summary');
+    Route::post('bulk', [IncidentReportsController::class, 'bulk'])
+        ->name('incident-reports.bulk');
+    Route::get('{maintenance}/incident-report', [IncidentReportsController::class, 'incident'])
+        ->name('incident-reports.incident');
+    Route::get('{maintenance}/service-report', [IncidentReportsController::class, 'service'])
+        ->name('incident-reports.service');
+});
 
 Route::post('maintenances/bulk',
     [BulkMaintenancesController::class, 'store']

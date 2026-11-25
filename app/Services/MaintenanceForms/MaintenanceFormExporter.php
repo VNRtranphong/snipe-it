@@ -53,6 +53,16 @@ class MaintenanceFormExporter
 
     private const BOX_OTHER = 'K7';
 
+    /** Human label for each equipment checkbox (same wording as the form). */
+    public const EQUIPMENT_LABELS = [
+        'A5' => 'Projector', 'C5' => 'Server', 'E5' => 'Processor',
+        'G5' => 'Amplifier', 'I5' => 'Speaker', 'K5' => 'TMS',
+        'A6' => 'Máy lạnh', 'C6' => 'Máy phát điện', 'E6' => 'UPS tổng',
+        'G6' => 'CCTV', 'I6' => 'TV - LED', 'K6' => 'Điện',
+        'A7' => 'Nước', 'C7' => 'XLNT', 'E7' => 'CSVC',
+        'G7' => 'Xe bắp', 'I7' => 'Hâm bắp', 'K7' => 'Khác',
+    ];
+
     /** Font size of the "Serial" line in the Report header boxes (template uses 18). */
     private const SERIAL_FONT_SIZE = 12;
 
@@ -128,6 +138,9 @@ class MaintenanceFormExporter
             'purchase_date' => self::date($asset?->purchase_date),
             'site' => $site,
             'hall' => $hall,
+            // Raw timestamps for duration / filtering (not used by the forms).
+            'start_at' => $maintenance->start_date ? Carbon::parse($maintenance->start_date) : null,
+            'completed_at_dt' => $maintenance->completed_at ? Carbon::parse($maintenance->completed_at) : null,
         ];
     }
 
@@ -296,7 +309,13 @@ class MaintenanceFormExporter
     }
 
     /** @param array<string, mixed> $d */
-    private static function modelLabel(array $d): string
+    public static function equipmentLabel(array $d): string
+    {
+        return self::EQUIPMENT_LABELS[self::equipmentBox($d)];
+    }
+
+    /** @param array<string, mixed> $d */
+    public static function modelLabel(array $d): string
     {
         $model = $d['model'];
         if ($d['model_number'] !== '' && ! str_contains($model, $d['model_number'])) {
