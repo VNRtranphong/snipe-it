@@ -71,7 +71,7 @@ class MaintenancesTransformer
             'url' => ($assetmaintenance->url) ? e($assetmaintenance->url) : null,
             'cost' => Helper::formatCurrencyOutput($assetmaintenance->cost),
             'asset_maintenance_type' => e($assetmaintenance->asset_maintenance_type),
-            'start_date' => Helper::getFormattedDateObject($assetmaintenance->start_date, 'date'),
+            'start_date' => Helper::getFormattedDateObject($assetmaintenance->start_date, 'datetime'),
             'asset_maintenance_time' => (int) $assetmaintenance->asset_maintenance_time,
             'expected_completion_date' => Helper::getFormattedDateObject($assetmaintenance->expected_completion_date, 'date'),
             // Legacy alias for `expected_completion_date` (the column was
