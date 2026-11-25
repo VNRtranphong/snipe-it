@@ -111,7 +111,7 @@ class MaintenanceFormExporter
             $asset = $maintenance->item;
         }
 
-        [$site, $hall] = self::siteAndHall($asset);
+        [$site, $hall, $hallGuessed] = self::siteAndHall($asset);
 
         $technician = $maintenance->responsibleParty?->display_name
             ?? $maintenance->adminuser?->display_name
@@ -141,6 +141,7 @@ class MaintenanceFormExporter
             'purchase_date' => self::date($asset?->purchase_date),
             'site' => $site,
             'hall' => $hall,
+            'hall_guessed' => $hallGuessed,
             // Raw timestamps for duration / filtering (not used by the forms).
             'start_at' => $maintenance->start_date ? Carbon::parse($maintenance->start_date) : null,
             'completed_at_dt' => $maintenance->completed_at ? Carbon::parse($maintenance->completed_at) : null,
@@ -157,7 +158,7 @@ class MaintenanceFormExporter
     public static function siteAndHall(?Asset $asset): array
     {
         if (! $asset) {
-            return ['', ''];
+            return ['', '', false];
         }
 
         $isHall = fn (?Location $l) => $l && preg_match('/\b(hall|phong chieu)\b/i', Str::ascii($l->name));
@@ -184,7 +185,35 @@ class MaintenanceFormExporter
         $hall = $hallLoc ? trim(preg_replace('/^\s*hall\s*/i', '', $hallLoc->name)) : '';
         $site = $siteLoc?->name ?? ($asset->company?->name ?? '');
 
-        return [(string) $site, $hall];
+        // Not in a "Hall" location: guess from the asset name ("HUẾ Projector Hall1").
+        $guessed = false;
+        if ($hall === '') {
+            $fromName = self::hallFromName((string) $asset->name);
+            if ($fromName !== null) {
+                $hall = $fromName;
+                $guessed = true;
+            }
+        }
+
+        return [(string) $site, $hall, $guessed];
+    }
+
+    /**
+     * Hall number written in an asset name, or null.
+     *   "HUẾ Projector Hall1"   => "1"
+     *   "HL PROJECTOR HALL 7"   => "7"
+     *   "TK Server Hall_03"     => "3"
+     *   "Loa phòng chiếu 2"     => "2"
+     *   "Screen 4 Processor"    => "4"
+     */
+    public static function hallFromName(string $name): ?string
+    {
+        $ascii = Str::lower(Str::ascii($name));
+        if (preg_match('/(?:^|[^a-z])(?:hall|phong chieu|phong|screen|aud(?:itorium)?)\s*[-_#.:]?\s*0*(\d{1,2})(?!\d)/', $ascii, $m)) {
+            return $m[1] === '' ? null : $m[1];
+        }
+
+        return null;
     }
 
     private static function date(mixed $value): string

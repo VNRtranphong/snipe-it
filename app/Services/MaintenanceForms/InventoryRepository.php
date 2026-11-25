@@ -46,11 +46,12 @@ class InventoryRepository
 
         $rows = [];
         foreach ($assets->take(self::MAX_ROWS) as $asset) {
-            [$site, $hall] = MaintenanceFormExporter::siteAndHall($asset);
+            [$site, $hall, $hallGuessed] = MaintenanceFormExporter::siteAndHall($asset);
             $rows[] = [
                 'id' => $asset->id,
                 'site' => $site,
                 'hall' => $hall,
+                'hall_guessed' => $hallGuessed,
                 'name' => (string) $asset->name,
                 'asset_tag' => (string) $asset->asset_tag,
                 'serial' => (string) $asset->serial,
@@ -233,7 +234,7 @@ class InventoryRepository
             $rows[] = [
                 $i + 1,
                 $r['site'] !== '' ? $r['site'] : self::NO_SITE,
-                $r['hall'] !== '' ? 'Hall '.$r['hall'] : '',
+                $r['hall'] !== '' ? 'Hall '.$r['hall'].(! empty($r['hall_guessed']) ? ' (theo tên)' : '') : '',
                 $r['name'],
                 trim($r['model'].($r['model_number'] && ! str_contains($r['model'], $r['model_number']) ? ' ('.$r['model_number'].')' : '')),
                 $r['category'],

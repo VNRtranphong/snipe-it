@@ -227,6 +227,9 @@
                         </table>
                     </div>
                 </div>
+                <p class="text-muted" style="margin:6px 0 0; font-size:12px">
+                    Phòng có dấu <strong>*</strong> là đoán từ tên thiết bị, vì thiết bị chưa được giao (checkout) vào Location Hall.
+                </p>
                 <p id="ir-inv-message" class="text-muted" style="margin:8px 0 0; font-size:12px">
                     Chọn Category hoặc Model để xem có bao nhiêu thiết bị, đang lắp ở rạp nào, phòng nào và serial.
                     Có thể bấm vào tên model trong bảng sự cố bên dưới.
@@ -285,7 +288,7 @@
                                     <td style="white-space:nowrap">{{ $fmt($r['start_at']) }}</td>
                                     <td>
                                         {{ $r['site'] ?: '—' }}
-                                        @if ($r['hall_label'])<br><small class="text-muted">{{ $r['hall_label'] }}</small>@endif
+                                        @if ($r['hall_label'])<br><small class="text-muted">{{ $r['hall_label'] }}@if (! empty($r['hall_guessed']))<span title="Đoán từ tên thiết bị (thiết bị chưa được giao vào Location Hall)">*</span>@endif</small>@endif
                                     </td>
                                     <td>
                                         {{ $r['asset_name'] }}
@@ -536,7 +539,7 @@
                 return '<tr' + (dup ? ' class="ir-dup"' : '') + '>'
                     + '<td>' + (i + 1) + '</td>'
                     + '<td>' + (r.site ? esc(r.site) : '<span class="text-muted">' + esc(noSite) + '</span>') + '</td>'
-                    + '<td>' + (r.hall ? 'Hall ' + esc(r.hall) : '') + '</td>'
+                    + '<td>' + (r.hall ? 'Hall ' + esc(r.hall) + (r.hall_guessed ? ' <span class="text-muted" title="Đoán từ tên thiết bị (chưa được giao vào Location Hall)">*</span>' : '') : '') + '</td>'
                     + '<td><a href="' + assetUrl + encodeURIComponent(r.id) + '">' + esc(r.name || r.asset_tag) + '</a></td>'
                     + '<td>' + esc(model) + '</td>'
                     + '<td><code>' + esc(r.serial) + '</code>' + dupNote + '</td>'
