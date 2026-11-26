@@ -20,7 +20,7 @@ use Illuminate\Support\Str;
  */
 class CertificateReportService
 {
-    public const MONTHS_AHEAD = 3;
+    public const MONTHS_AHEAD = 6;
 
     /** Red when this close (or already expired). */
     public const URGENT_DAYS = 30;
