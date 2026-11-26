@@ -9,6 +9,9 @@
 
 @push('css')
 <style>
+    /* Follow Snipe-IT light/dark mode (AdminLTE hard-codes .info-box to white). */
+    .info-box { background-color: var(--box-bg, #ffffff) !important; color: var(--color-fg, #373636) !important; }
+    .info-box .info-box-text, .info-box .info-box-number, .info-box .progress-description { color: inherit !important; }
     .ir-filters .form-group { margin-right: 8px; margin-bottom: 8px; }
     .ir-filters label { display: block; font-weight: 600; font-size: 12px; margin-bottom: 2px; }
     .ir-table td { vertical-align: top !important; }

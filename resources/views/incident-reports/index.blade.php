@@ -9,6 +9,9 @@
 
 @push('css')
 <style>
+    /* Follow Snipe-IT light/dark mode (AdminLTE hard-codes .info-box to white). */
+    .info-box { background-color: var(--box-bg, #ffffff) !important; color: var(--color-fg, #373636) !important; }
+    .info-box .info-box-text, .info-box .info-box-number, .info-box .progress-description { color: inherit !important; }
     .ir-stats .info-box { min-height: 74px; margin-bottom: 12px; }
     .ir-stats .info-box-icon { height: 74px; line-height: 74px; width: 74px; font-size: 32px; }
     .ir-stats .info-box-content { margin-left: 74px; }
