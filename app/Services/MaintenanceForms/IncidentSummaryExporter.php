@@ -19,6 +19,11 @@ class IncidentSummaryExporter
     {
         $period = $f['from']->format('d/m/Y').' – '.$f['to']->format('d/m/Y');
         $scope = array_filter([
+            match ($f['kind'] ?? IncidentReportRepository::KIND_INCIDENT) {
+                IncidentReportRepository::KIND_MAINTENANCE => 'Chỉ phiếu bảo trì',
+                IncidentReportRepository::KIND_ALL => 'Sự cố + bảo trì',
+                default => 'Chỉ sự cố (không tính bảo trì)',
+            },
             $f['site'] !== '' ? 'Site: '.$f['site'] : 'Tất cả site',
             $f['hall'] !== '' ? 'Hall '.$f['hall'] : null,
             $f['equipment'] !== '' ? $f['equipment'] : null,

@@ -60,6 +60,7 @@
                 'hall' => $filters['hall'],
                 'equipment' => $filters['equipment'],
                 'q' => $filters['q'],
+                'kind' => $filters['kind'] !== 'incident' ? $filters['kind'] : '',
             ];
             $cardBase = array_filter($cardBase, fn ($v) => $v !== '') + ['site' => ''];
             $cards = [
@@ -142,6 +143,14 @@
                         </select>
                     </div>
                     <div class="form-group">
+                        <label for="ir-kind">Loại phiếu</label>
+                        <select id="ir-kind" name="kind" class="form-control input-sm">
+                            <option value="incident" @selected($filters['kind'] === 'incident')>Sự cố</option>
+                            <option value="maintenance" @selected($filters['kind'] === 'maintenance')>Bảo trì / bảo dưỡng</option>
+                            <option value="all" @selected($filters['kind'] === 'all')>Tất cả</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label for="ir-status">Trạng thái</label>
                         <select id="ir-status" name="status" class="form-control input-sm">
                             <option value="">Tất cả</option>
@@ -163,6 +172,7 @@
                 </form>
                 <p class="text-muted" style="margin:6px 0 0; font-size:12px">
                     Lọc theo ngày bắt đầu sự cố. Sự cố chưa xong từ các tháng trước vẫn được hiện để không bị sót.
+                    Phiếu có Type hoặc tiêu đề chứa "bảo trì" / "bảo dưỡng" là <strong>bảo trì</strong>, không tính là sự cố (chọn Loại phiếu để xem).
                     Thời gian xử lý tính liên tục 24h, từ Start Date đến Completed At (chưa xong thì tính đến hiện tại).
                 </p>
             </div>
@@ -307,6 +317,9 @@
                                     <td class="text-center">{{ $r['cancelled_count'] ?: '' }}</td>
                                     <td>{{ $r['technician'] }}</td>
                                     <td>
+                                        @if (! empty($r['is_maintenance']))
+                                            <span class="label label-info">Bảo trì</span><br>
+                                        @endif
                                         @if ($r['done'])
                                             <span class="label label-success">Hoàn thành</span>
                                         @else
@@ -442,7 +455,7 @@
         }
 
         // Changing site reloads hall options; changing other selects applies at once.
-        ['ir-site', 'ir-hall', 'ir-equipment', 'ir-status'].forEach(function (id) {
+        ['ir-site', 'ir-hall', 'ir-equipment', 'ir-kind', 'ir-status'].forEach(function (id) {
             var el = document.getElementById(id);
             if (!el) { return; }
             el.addEventListener('change', function () {

@@ -32,6 +32,13 @@ class IncidentReportRepository
 
     public const STATUS_OVERDUE = 'overdue';
 
+    /** Loại phiếu filter. Default: incidents only. */
+    public const KIND_INCIDENT = 'incident';
+
+    public const KIND_MAINTENANCE = 'maintenance';
+
+    public const KIND_ALL = 'all';
+
     /** Incidents that caused cancelled shows. */
     public const STATUS_CANCELLED = 'cancelled';
 
@@ -64,6 +71,8 @@ class IncidentReportRepository
             'status' => in_array($input['status'] ?? '', [self::STATUS_OPEN, self::STATUS_DONE, self::STATUS_OVERDUE, self::STATUS_CANCELLED], true)
                 ? $input['status'] : '',
             'q' => trim((string) ($input['q'] ?? '')),
+            'kind' => in_array($input['kind'] ?? '', [self::KIND_MAINTENANCE, self::KIND_ALL], true)
+                ? $input['kind'] : self::KIND_INCIDENT,
         ];
     }
 
@@ -128,9 +137,11 @@ class IncidentReportRepository
             $hours = max(0, $start->diffInMinutes($end ?? $now, true) / 60);
         }
 
+        $d['is_maintenance'] = IncidentStatsService::isMaintenance($d);
         $d['done'] = $end !== null;
         $d['hours'] = $hours;
-        $d['overdue'] = $hours !== null && $hours > self::OVERDUE_HOURS;
+        // Planned maintenance is never "quá 24h" – only incidents are.
+        $d['overdue'] = ! $d['is_maintenance'] && $hours !== null && $hours > self::OVERDUE_HOURS;
         $d['duration_label'] = self::durationLabel($hours);
         $d['status_label'] = $d['done'] ? 'Hoàn thành' : 'Đang xử lý';
         $d['equipment'] = MaintenanceFormExporter::equipmentLabel($d);
@@ -149,7 +160,15 @@ class IncidentReportRepository
     {
         $q = $f['q'] !== '' ? self::fold($f['q']) : '';
 
-        return array_values(array_filter($rows, function (array $r) use ($f, $q) {
+        $kind = $f['kind'] ?? self::KIND_INCIDENT;
+
+        return array_values(array_filter($rows, function (array $r) use ($f, $q, $kind) {
+            if ($kind === self::KIND_INCIDENT && ! empty($r['is_maintenance'])) {
+                return false;
+            }
+            if ($kind === self::KIND_MAINTENANCE && empty($r['is_maintenance'])) {
+                return false;
+            }
             if ($f['site'] !== '' && self::fold($r['site']) !== self::fold($f['site'])) {
                 return false;
             }

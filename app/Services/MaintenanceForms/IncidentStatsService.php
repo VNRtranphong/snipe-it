@@ -31,10 +31,14 @@ class IncidentStatsService
         'overdue' => 'Sự cố quá 24h',
     ];
 
-    /** Ascii-lowercased type/name patterns that mean planned maintenance, not an incident. */
+    /**
+     * Ascii-lowercased patterns that mean planned maintenance, not an incident.
+     * Type: any of these words anywhere. Title: "bảo trì" / "bảo dưỡng" anywhere
+     * (e.g. "Bảo trì định kỳ 7 phòng KDV"), or starting with maintenance / vệ sinh.
+     */
     private const MAINTENANCE_TYPE = '/\b(maintenance|bao tri|bao duong|dinh ky|ve sinh|preventive)\b/';
 
-    private const MAINTENANCE_NAME = '/^\s*(bao tri|bao duong|maintenance|ve sinh)\b/';
+    private const MAINTENANCE_NAME = '/\b(bao tri|bao duong)\b|^\s*(maintenance|ve sinh)\b/';
 
     public static function isMaintenance(array $r): bool
     {
