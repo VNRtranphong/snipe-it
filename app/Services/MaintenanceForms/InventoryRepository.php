@@ -80,6 +80,19 @@ class InventoryRepository
     public const OVERVIEW_KINDS = ['Projector', 'Server', 'Processor'];
 
     /**
+     * Locations that are not cinemas (office, MEP …) – left out of the
+     * overview. Compared case/accent-insensitively; add names here.
+     */
+    public const OVERVIEW_EXCLUDED_SITES = ['vp ho', 'mep'];
+
+    public static function isExcludedSite(string $site): bool
+    {
+        $key = trim(preg_replace('/\s+/', ' ', \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii($site))));
+
+        return in_array($key, self::OVERVIEW_EXCLUDED_SITES, true);
+    }
+
+    /**
      * Tổng quan: sites, rooms per site and which Projector / Server /
      * Processor models each site uses.
      *
@@ -128,8 +141,16 @@ class InventoryRepository
         $unassigned = array_fill_keys(self::OVERVIEW_KINDS, 0);
         $totals = array_fill_keys(self::OVERVIEW_KINDS, 0);
 
+        $modelTotals = array_fill_keys(self::OVERVIEW_KINDS, []);
+
         foreach ($rows as $r) {
+            if ($r['site'] !== '' && self::isExcludedSite($r['site'])) {
+                continue;
+            }
             $totals[$r['kind']]++;
+            $mk = (string) ($r['model_id'] ?? $r['model']);
+            $modelTotals[$r['kind']][$mk] ??= ['model' => $r['model'], 'model_id' => $r['model_id'], 'category_id' => $r['category_id'], 'count' => 0];
+            $modelTotals[$r['kind']][$mk]['count']++;
             if ($r['site'] === '') {
                 $unassigned[$r['kind']]++;
 
@@ -167,10 +188,17 @@ class InventoryRepository
         }
         usort($out, fn ($a, $b) => strnatcasecmp($a['site'], $b['site']));
 
+        foreach ($modelTotals as $kind => $list) {
+            $list = array_values($list);
+            usort($list, fn ($a, $b) => $b['count'] <=> $a['count'] ?: strnatcasecmp($a['model'], $b['model']));
+            $modelTotals[$kind] = $list;
+        }
+
         return [
             'totals' => ['sites' => count($out), 'rooms' => array_sum(array_column($out, 'rooms'))] + $totals,
             'sites' => $out,
             'unassigned' => $unassigned,
+            'models' => $modelTotals,
         ];
     }
 

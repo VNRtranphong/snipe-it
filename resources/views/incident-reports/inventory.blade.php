@@ -34,6 +34,13 @@
     .ir-ov-model:hover { background: rgba(60,141,188,.18); }
     .ir-ov-model b { margin-left: 3px; }
     .ir-ov-none { opacity: .45; font-size: 12px; }
+    .ir-ov-cov { display: inline-block; min-width: 46px; text-align: center; font-weight: 700; font-size: 12px;
+                 padding: 1px 6px; border-radius: 10px; margin: 0 6px 4px 0; }
+    .ir-ov-cov.ok { background: rgba(0,166,90,.18); color: #3fd68c; }
+    .ir-ov-cov.short { background: rgba(221,75,57,.22); color: #ff7a6b; }
+    .ir-ov-cov.extra { background: rgba(247,148,29,.2); color: #f7b25c; }
+    .ir-ov-mchart { position: relative; }
+    .ir-ov-legend span { display: inline-block; margin-right: 14px; font-size: 12px; }
 </style>
 @endpush
 
@@ -150,15 +157,29 @@
             </div>
 
             @if (count($overview['sites']))
-                <div class="box box-default">
-                    <div class="box-header with-border">
-                        <h2 class="box-title"><i class="fas fa-chart-bar" aria-hidden="true"></i> Số phòng và thiết bị theo rạp</h2>
-                    </div>
-                    <div class="box-body">
-                        <div class="ir-ov-chart-wrap" style="height: {{ max(260, 28 * count($overview['sites']) + 60) }}px">
-                            <canvas id="ir-ov-chart" role="img" aria-label="Số phòng, projector, server, processor theo rạp"></canvas>
+                <div class="row">
+                    @foreach ($ovKinds as $k)
+                        @php $mList = array_slice($overview['models'][$k], 0, 12); @endphp
+                        <div class="col-md-4">
+                            <div class="box box-default">
+                                <div class="box-header with-border">
+                                    <h2 class="box-title"><i class="fas {{ $ovIcons[$k] }}" aria-hidden="true"></i> Model {{ $k }} đang dùng</h2>
+                                </div>
+                                <div class="box-body">
+                                    @if (count($mList))
+                                        <div class="ir-ov-mchart" style="height: {{ 40 + 26 * count($mList) }}px">
+                                            <canvas class="ir-ov-mcanvas" data-kind="{{ $k }}" role="img" aria-label="Số lượng {{ $k }} theo model"></canvas>
+                                        </div>
+                                        @if (count($overview['models'][$k]) > 12)
+                                            <p class="text-muted" style="font-size:12px; margin:4px 0 0">Hiện 12 model nhiều nhất / {{ count($overview['models'][$k]) }} model.</p>
+                                        @endif
+                                    @else
+                                        <p class="text-muted">Chưa có {{ $k }}.</p>
+                                    @endif
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    @endforeach
                 </div>
 
                 <div class="box box-default">
@@ -166,7 +187,12 @@
                         <h2 class="box-title"><i class="fas fa-table" aria-hidden="true"></i> Rạp đang dùng thiết bị gì</h2>
                     </div>
                     <div class="box-body">
-                        <p class="text-muted" style="font-size:12px; margin-top:0">Bấm vào một model để xem chi tiết từng máy: phòng nào, serial bao nhiêu.</p>
+                        <p class="text-muted ir-ov-legend" style="font-size:12px; margin-top:0">
+                            Bấm vào một model để xem chi tiết từng máy (phòng nào, serial bao nhiêu). Số máy / số phòng:
+                            <span><span class="ir-ov-cov ok">6/6</span> đủ</span>
+                            <span><span class="ir-ov-cov short">5/6</span> thiếu</span>
+                            <span><span class="ir-ov-cov extra">7/6</span> dư / dự phòng</span>
+                        </p>
                         <div class="table-responsive">
                             <table class="table table-striped table-condensed ir-ov-table">
                                 <thead>
@@ -189,7 +215,15 @@
                                                 @endif
                                             </td>
                                             @foreach ($ovKinds as $k)
+                                                @php
+                                                    $cnt = $os['counts'][$k] ?? 0;
+                                                    $cov = $os['rooms'] > 0 ? ($cnt === $os['rooms'] ? 'ok' : ($cnt < $os['rooms'] ? 'short' : 'extra')) : '';
+                                                    $covTitle = ['ok' => 'Đủ: mỗi phòng 1 máy', 'short' => 'Thiếu '.($os['rooms'] - $cnt).' so với số phòng', 'extra' => 'Dư '.($cnt - $os['rooms']).' (máy dự phòng / chưa gán đúng phòng)', '' => ''][$cov];
+                                                @endphp
                                                 <td>
+                                                    @if ($cov)
+                                                        <span class="ir-ov-cov {{ $cov }}" title="{{ $covTitle }}">{{ $cnt }}/{{ $os['rooms'] }}</span><br>
+                                                    @endif
                                                     @forelse ($os['kinds'][$k] as $m)
                                                         @if ($m['model_id'])
                                                             <a href="#" class="ir-ov-model" data-model-id="{{ $m['model_id'] }}" data-category-id="{{ $m['category_id'] }}"
@@ -209,6 +243,7 @@
                         </div>
                         <p class="text-muted" style="font-size:12px; margin:6px 0 0">
                             Số phòng = số Hall khác nhau có Projector / Server / Processor (gồm cả phòng đoán từ tên thiết bị).
+                            Không tính các location: VP HO, MEP.
                             Loại thiết bị nhận theo Category, rồi theo tên model / tên thiết bị.
                         </p>
                     </div>
@@ -433,35 +468,45 @@
             });
         }
 
-        // Overview chart: rooms + equipment per site (horizontal bars).
-        var ovCanvas = document.getElementById('ir-ov-chart');
-        if (ovCanvas && typeof Chart !== 'undefined') {
-            var ov = @json($overview['sites']);
+        // Overview: one horizontal bar chart of models per equipment kind. Click a bar => open that model.
+        if (typeof Chart !== 'undefined') {
+            var ovModels = @json($overview['models']);
             var dark = (typeof isDark === 'function') && isDark();
             var grid = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
             Chart.defaults.global.defaultFontColor = dark ? '#cccccc' : '#666666';
-            var col = function (k) { return ov.map(function (s) { return s.counts[k] || 0; }); };
-            new Chart(ovCanvas.getContext('2d'), {
-                type: 'horizontalBar',
-                data: {
-                    labels: ov.map(function (s) { return s.site; }),
-                    datasets: [
-                        { label: 'Số phòng', data: ov.map(function (s) { return s.rooms; }), backgroundColor: 'rgba(60,141,188,0.85)' },
-                        { label: 'Projector', data: col('Projector'), backgroundColor: 'rgba(96,92,168,0.8)' },
-                        { label: 'Server', data: col('Server'), backgroundColor: 'rgba(243,156,18,0.8)' },
-                        { label: 'Processor', data: col('Processor'), backgroundColor: 'rgba(0,166,90,0.8)' }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    legend: { position: 'bottom' },
-                    tooltips: { mode: 'index', intersect: false },
-                    scales: {
-                        xAxes: [{ ticks: { beginAtZero: true, precision: 0 }, gridLines: { color: grid } }],
-                        yAxes: [{ gridLines: { display: false }, barPercentage: 0.9, categoryPercentage: 0.85 }]
+            var colors = { Projector: 'rgba(96,92,168,0.85)', Server: 'rgba(243,156,18,0.85)', Processor: 'rgba(0,166,90,0.85)' };
+            Array.prototype.forEach.call(document.querySelectorAll('canvas.ir-ov-mcanvas'), function (cv) {
+                var kind = cv.getAttribute('data-kind');
+                var list = (ovModels[kind] || []).slice(0, 12);
+                var chart = new Chart(cv.getContext('2d'), {
+                    type: 'horizontalBar',
+                    data: {
+                        labels: list.map(function (m) { return m.model; }),
+                        datasets: [{ label: kind, data: list.map(function (m) { return m.count; }), backgroundColor: colors[kind] }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        legend: { display: false },
+                        tooltips: { callbacks: { label: function (t) { return ' ' + t.xLabel + ' máy (bấm để xem chi tiết)'; } } },
+                        scales: {
+                            xAxes: [{ ticks: { beginAtZero: true, precision: 0 }, gridLines: { color: grid } }],
+                            yAxes: [{ gridLines: { display: false }, barPercentage: 0.8, categoryPercentage: 0.9 }]
+                        },
+                        onHover: function (e, els) { cv.style.cursor = els && els.length ? 'pointer' : 'default'; },
+                        onClick: function (e, els) {
+                            if (!els || !els.length) { return; }
+                            var m = list[els[0]._index];
+                            if (!m || !m.model_id) { return; }
+                            catSel.value = m.category_id ? String(m.category_id) : '';
+                            filterModels();
+                            modelSel.value = String(m.model_id);
+                            syncUrl();
+                            load();
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }
                     }
-                }
+                });
             });
         }
     })();
