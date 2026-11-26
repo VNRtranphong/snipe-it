@@ -137,6 +137,19 @@ class LicenseReportService
      * @param  array<string, mixed>  $r
      * @return array<string, mixed>
      */
+    /** Licenses are bought per year: next end = old end + 1 year (rolled past today if long expired). */
+    public const RENEW_YEARS = 1;
+
+    public static function renewUntil(Carbon $end, Carbon $today): Carbon
+    {
+        $next = $end->copy()->addYears(self::RENEW_YEARS);
+        for ($i = 0; $i < 20 && $next->lt($today); $i++) {
+            $next = $next->addYears(self::RENEW_YEARS);
+        }
+
+        return $next;
+    }
+
     public static function decorate(array $r, Carbon $today): array
     {
         $exp = $r['expiration_date'] ?? null;
@@ -154,6 +167,7 @@ class LicenseReportService
         $r['end_date'] = $end;
         $r['end_label'] = $end ? $end->format('d/m/Y') : '';
         $r['end_kind'] = $kind;
+        $r['renew_label'] = $end ? self::renewUntil($end, $today)->format('d/m/Y') : '';
         $r['days_left'] = $days;
         $r['state'] = $days === null ? 'none' : ($days < 0 ? 'expired' : ($days <= self::CARD_DAYS ? 'soon' : 'later'));
 
@@ -244,6 +258,7 @@ class LicenseReportService
                     'site' => $b['site'],
                     'rooms' => $b['rooms'],
                     'end_label' => $r['end_label'],
+                    'renew_label' => $r['renew_label'] ?? '',
                     'days_left' => $r['days_left'],
                     'source' => $r['source'],
                 ];
@@ -289,24 +304,25 @@ class LicenseReportService
                 $l['rooms'] ?? null,
                 $l['mac'] ?? '',
                 $l['end_label'],
+                $l['renew_label'] ?? '',
             ];
             if ($l['days_left'] < 0) {
                 $styles[$i] = 'red';
             }
         }
         foreach ($report['unresolved'] as $u) {
-            $rows[] = [count($rows) + 1, $u['product'] ?: $u['name'], '(chưa xác định rạp: '.$u['name'].')', null, $u['mac'] ?? '', $u['end_label']];
+            $rows[] = [count($rows) + 1, $u['product'] ?: $u['name'], '(chưa xác định rạp: '.$u['name'].')', null, $u['mac'] ?? '', $u['end_label'], $u['renew_label'] ?? ''];
             $styles[count($rows) - 1] = 'red';
         }
 
         $w = new SimpleXlsxWriter;
         $totalRooms = array_sum(array_map(fn ($l) => (int) ($l['rooms'] ?? 0), $report['lines']));
-        $w->addSheet('Cần mua', ['STT', 'Sản phẩm', 'Rạp', 'Số phòng (SL cần mua)', 'MAC', 'Ngày kết thúc'], $rows, [
+        $w->addSheet('Cần mua', ['STT', 'Sản phẩm', 'Rạp', 'Số phòng (SL cần mua)', 'MAC', 'Ngày kết thúc', 'Cần mua đến'], $rows, [
             'title' => 'DANH SÁCH LICENSE CẦN MUA TIẾP',
             'subtitle' => 'License đã hết hạn hoặc hết hạn trong '.self::SOON_DAYS.' ngày  |  Xuất lúc '.date('d/m/Y H:i'),
-            'widths' => [6, 24, 26, 14, 20, 14],
+            'widths' => [6, 24, 26, 14, 20, 14, 14],
             'rowStyles' => $styles,
-            'totalRow' => $rows ? ['Tổng', null, count($report['lines']).' license', $totalRooms, null, null] : null,
+            'totalRow' => $rows ? ['Tổng', null, count($report['lines']).' license', $totalRooms, null, null, null] : null,
         ]);
 
         $p = [];
