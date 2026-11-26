@@ -57,7 +57,7 @@ class LicenseReportService
         $limit = $today->copy()->addDays(self::SOON_DAYS)->endOfDay();
 
         $licenses = License::query()
-            ->select(['id', 'name', 'license_name', 'seats', 'expiration_date', 'termination_date', 'manufacturer_id', 'category_id', 'company_id'])
+            ->select(['id', 'name', 'license_name', 'license_email', 'notes', 'order_number', 'purchase_order', 'seats', 'expiration_date', 'termination_date', 'manufacturer_id', 'category_id', 'company_id'])
             ->where(function ($q) use ($limit) {
                 $q->where(fn ($e) => $e->whereNotNull('expiration_date')->where('expiration_date', '<=', $limit))
                     ->orWhere(fn ($t) => $t->whereNotNull('termination_date')->where('termination_date', '<=', $limit));
@@ -107,6 +107,10 @@ class LicenseReportService
                 'id' => $license->id,
                 'name' => (string) $license->name,
                 'licensed_to' => (string) ($license->license_name ?? ''),
+                'mac' => self::findMac([
+                    $license->notes, $license->license_email, $license->license_name,
+                    $license->order_number, $license->purchase_order,
+                ]),
                 'manufacturer' => (string) ($license->manufacturer?->name ?? ''),
                 'category' => (string) ($license->category?->name ?? ''),
                 'seats' => (int) $license->seats,
@@ -234,6 +238,7 @@ class LicenseReportService
                 $lines[] = [
                     'license_id' => $r['id'],
                     'license' => $r['name'],
+                    'mac' => $r['mac'] ?? '',
                     'product' => $r['product'],
                     'site' => $b['site'],
                     'rooms' => $b['rooms'],
@@ -283,6 +288,7 @@ class LicenseReportService
                 $l['rooms'] ?? null,
                 $l['rooms'] === null ? 'Chưa rõ số phòng' : '1 license cho rạp '.$l['site'].', số lượng '.$l['rooms'].' phòng',
                 $l['license'],
+                $l['mac'] ?? '',
                 $l['end_label'],
                 $l['days_left'] < 0 ? 'Quá hạn '.abs($l['days_left']).' ngày' : 'Còn '.$l['days_left'].' ngày',
                 self::SOURCE_LABELS[$l['source']] ?? '',
@@ -292,19 +298,19 @@ class LicenseReportService
             }
         }
         foreach ($report['unresolved'] as $u) {
-            $rows[] = [count($rows) + 1, $u['product'] ?: $u['name'], '(chưa xác định rạp)', null, 'Cần gán seat hoặc ghi tên rạp vào Licensed To', $u['name'], $u['end_label'],
+            $rows[] = [count($rows) + 1, $u['product'] ?: $u['name'], '(chưa xác định rạp)', null, 'Cần gán seat hoặc ghi tên rạp vào Licensed To', $u['name'], $u['mac'] ?? '', $u['end_label'],
                 $u['days_left'] < 0 ? 'Quá hạn '.abs($u['days_left']).' ngày' : 'Còn '.$u['days_left'].' ngày', ''];
             $styles[count($rows) - 1] = 'red';
         }
 
         $w = new SimpleXlsxWriter;
         $totalRooms = array_sum(array_map(fn ($l) => (int) ($l['rooms'] ?? 0), $report['lines']));
-        $w->addSheet('Cần mua', ['STT', 'Sản phẩm', 'Rạp', 'Số phòng (SL cần mua)', 'Ghi chú mua', 'License hiện tại', 'Ngày kết thúc', 'Tình trạng', 'Xác định rạp'], $rows, [
+        $w->addSheet('Cần mua', ['STT', 'Sản phẩm', 'Rạp', 'Số phòng (SL cần mua)', 'Ghi chú mua', 'License hiện tại', 'MAC', 'Ngày kết thúc', 'Tình trạng', 'Xác định rạp'], $rows, [
             'title' => 'DANH SÁCH LICENSE CẦN MUA TIẾP',
             'subtitle' => 'License đã hết hạn hoặc hết hạn trong '.self::SOON_DAYS.' ngày  |  Xuất lúc '.date('d/m/Y H:i'),
-            'widths' => [5, 18, 22, 12, 42, 24, 13, 16, 18],
+            'widths' => [5, 14, 22, 12, 42, 24, 19, 13, 16, 18],
             'rowStyles' => $styles,
-            'totalRow' => $rows ? ['Tổng', null, count($report['lines']).' license', $totalRooms, null, null, null, null, null] : null,
+            'totalRow' => $rows ? ['Tổng', null, count($report['lines']).' license', $totalRooms, null, null, null, null, null, null] : null,
         ]);
 
         $p = [];
@@ -335,37 +341,60 @@ class LicenseReportService
     }
 
     /**
-     * Cinemas mentioned in a text: full name contained ("AAM Nguyễn Du")
-     * or the cinema code as a separate word ("AAM ND", "AAM-ND").
-     * A code shared by two cinemas is ignored (ambiguous).
+     * Words that do not identify a cinema on their own (brand / mall words).
+     * "center" and "centre" are treated the same.
+     */
+    private const GENERIC_WORDS = ['aeon', 'go', 'vincom', 'thiso', 'galaxy', 'cinema', 'cgv', 'mall', 'center', 'centre', 'plaza', 'tttm', 'rap'];
+
+    /**
+     * Cinemas mentioned in a text.
+     *
+     *  1. By words, in any order: every significant word of the cinema name
+     *     must appear ("AAM Bến Tre Sense" = Sense Bến Tre, "AAM Phan Huy Ích"
+     *     = Thiso Phan Huy Ích, "AAM Hà Nội Centre" = Hà Nội Center).
+     *     When several cinemas match, the one with most matching words wins
+     *     ("Bến Tre Sense" -> Sense Bến Tre, not Go Bến Tre).
+     *  2. Otherwise by cinema code as a separate word ("AAM ND" -> Nguyễn Du).
+     *     A code shared by two cinemas is ignored (ambiguous).
      *
      * @param  list<string>  $sites
      * @return list<string>
      */
     public static function sitesInText(string $text, array $sites): array
     {
-        $hay = ' '.preg_replace('/[^a-z0-9]+/', ' ', self::fold($text)).' ';
-        $found = [];
+        $words = self::words($text);
+        if (! $words) {
+            return [];
+        }
 
-        // Longer names first so "Go Bến Tre" wins over "Bến Tre".
-        $byLen = $sites;
-        usort($byLen, fn ($a, $b) => mb_strlen($b) <=> mb_strlen($a));
-        foreach ($byLen as $s) {
-            $needle = ' '.preg_replace('/[^a-z0-9]+/', ' ', self::fold($s)).' ';
-            if (trim($needle) !== '' && str_contains($hay, $needle)) {
-                $found[$s] = true;
-                $hay = str_replace($needle, ' ', $hay);
+        $best = [];
+        $bestScore = 0;
+        foreach ($sites as $s) {
+            $sig = array_values(array_diff(self::words($s), self::GENERIC_WORDS));
+            if (! $sig || array_diff($sig, $words)) {
+                continue; // a significant word of the cinema is missing
+            }
+            $score = count($sig);
+            if ($score > $bestScore) {
+                $best = [$s];
+                $bestScore = $score;
+            } elseif ($score === $bestScore) {
+                $best[] = $s;
             }
         }
-        if ($found) {
-            return array_keys($found);
+        if (count($best) === 1) {
+            return $best;
+        }
+        if (count($best) > 1) {
+            return []; // ambiguous
         }
 
         $codes = [];
         foreach ($sites as $s) {
             $codes[strtolower(MaintenanceFormExporter::siteCode($s))][] = $s;
         }
-        foreach (array_filter(explode(' ', $hay)) as $word) {
+        $found = [];
+        foreach ($words as $word) {
             if (strlen($word) >= 2 && isset($codes[$word]) && count($codes[$word]) === 1) {
                 $found[$codes[$word][0]] = true;
             }
@@ -374,16 +403,62 @@ class LicenseReportService
         return array_keys($found);
     }
 
-    /** "AAM ND" -> "AAM", "TMS - Nguyễn Du" -> "TMS". */
+    /** First MAC address found in the given texts ("00:1A:2B:3C:4D:5E", "00-1A-…", "001A2B3C4D5E"). */
+    public static function findMac(array $texts): string
+    {
+        foreach ($texts as $t) {
+            $t = (string) $t;
+            if ($t === '') {
+                continue;
+            }
+            if (preg_match('/(?<![0-9A-Fa-f])([0-9A-Fa-f]{2}(?:[:\-][0-9A-Fa-f]{2}){5})(?![0-9A-Fa-f])/', $t, $m)) {
+                return strtoupper(str_replace('-', ':', $m[1]));
+            }
+            if (preg_match('/(?<![0-9A-Fa-f])([0-9A-Fa-f]{12})(?![0-9A-Fa-f])/', $t, $m) && preg_match('/[0-9]/', $m[1])) {
+                return strtoupper(implode(':', str_split($m[1], 2)));
+            }
+        }
+
+        return '';
+    }
+
+    /** Ascii, lower-case words; "centre" counted as "center". @return list<string> */
+    private static function words(string $text): array
+    {
+        $w = preg_split('/[^a-z0-9]+/', self::fold($text), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return array_values(array_map(fn ($x) => $x === 'centre' ? 'center' : $x, $w));
+    }
+
+    /**
+     * Product = license name without the cinema part.
+     *   "AAM Nguyễn Du" -> "AAM", "AAM Hà Nội Centre" -> "AAM",
+     *   "AAM ND" -> "AAM", "AAM BT Sense" (cinema found by seat) -> "AAM".
+     */
     public static function productName(string $name, array $sites): string
     {
-        $out = ' '.$name.' ';
+        $drop = self::GENERIC_WORDS;
         foreach ($sites as $s) {
-            $out = preg_replace('/(?<![\p{L}\p{N}])'.preg_quote($s, '/').'(?![\p{L}\p{N}])/iu', ' ', $out);
-            $code = MaintenanceFormExporter::siteCode($s);
-            $out = preg_replace('/(?<![\p{L}\p{N}])'.preg_quote($code, '/').'(?![\p{L}\p{N}])/iu', ' ', $out);
+            $drop = array_merge($drop, self::words($s), [strtolower(MaintenanceFormExporter::siteCode($s))]);
         }
-        $out = trim(preg_replace('/\s*[-–_|,]+\s*$|^\s*[-–_|,]+\s*/u', '', trim(preg_replace('/\s+/u', ' ', $out))));
+
+        $kept = [];
+        foreach (preg_split('/[\s\-–_|,\/]+/u', trim($name), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $word) {
+            $w = self::words($word);
+            if ($w && ! array_diff($w, $drop)) {
+                continue;
+            }
+            $kept[] = $word;
+        }
+
+        // Cinema found via seat but the name uses its own short form ("AAM BT Sense"):
+        // keep only the first word when the rest looks like a place, i.e. when
+        // something was removed or the first word is the manufacturer-style tag.
+        if ($sites && count($kept) > 1 && count($kept) < count(preg_split('/\s+/u', trim($name)))) {
+            $kept = [$kept[0]];
+        }
+
+        $out = trim(implode(' ', $kept));
 
         return $out !== '' ? $out : $name;
     }

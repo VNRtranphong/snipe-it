@@ -538,7 +538,6 @@
                                         <th>Ngày kết thúc</th>
                                         <th>Còn lại</th>
                                         <th>Cần mua tiếp</th>
-                                        <th class="text-center">Seat dùng / tổng</th>
                                         <th>Đang gắn cho</th>
                                     </tr>
                                 </thead>
@@ -576,7 +575,6 @@
                                                     <small class="text-muted">({{ \App\Services\MaintenanceForms\LicenseReportService::SOURCE_LABELS[$lic['source']] }})</small>
                                                 @endif
                                             </td>
-                                            <td class="text-center">{{ $lic['used'] }} / {{ $lic['seats'] }}</td>
                                             <td style="font-size:12px">
                                                 @forelse (array_slice($lic['where'], 0, 6) as $w)
                                                     {{ $w }}<br>
