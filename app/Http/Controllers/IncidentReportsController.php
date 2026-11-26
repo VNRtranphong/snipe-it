@@ -42,7 +42,7 @@ class IncidentReportsController extends Controller
     public function index(Request $request): View
     {
         $filters = IncidentReportRepository::filters($request->query(), $request->user());
-        $inRange = $this->repository->rowsInRange($filters);
+        $inRange = $this->repository->rowsInRange($filters, null, ! $filters['strict']);
         $rows = IncidentReportRepository::applyFilters($inRange, $filters);
 
         // Cards count everything except the status filter, so clicking a
@@ -251,7 +251,7 @@ class IncidentReportsController extends Controller
     public function summary(Request $request): BinaryFileResponse
     {
         $filters = IncidentReportRepository::filters($request->query(), $request->user());
-        $rows = IncidentReportRepository::applyFilters($this->repository->rowsInRange($filters), $filters);
+        $rows = IncidentReportRepository::applyFilters($this->repository->rowsInRange($filters, null, ! $filters['strict']), $filters);
 
         $docs = $this->documents->findMany(array_map(fn ($r) => (int) $r['id'], $rows));
         foreach ($rows as &$r) {

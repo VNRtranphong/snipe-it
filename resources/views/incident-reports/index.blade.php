@@ -29,6 +29,9 @@
     .ir-heat th, .ir-heat td { text-align: center; font-size: 12px; padding: 4px 6px !important; }
     .ir-heat td.ir-heat-site, .ir-heat th.ir-heat-site { text-align: left; white-space: nowrap; }
     .ir-heat .ir-heat-hidden { display: none; }
+    .ir-heat a.ir-heat-link { color: inherit; display: block; text-decoration: none; }
+    .ir-heat a.ir-heat-link:hover { text-decoration: underline; }
+    .ir-heat td:hover { outline: 2px solid #3c8dbc; outline-offset: -2px; }
     .ir-bulkbar { margin-bottom: 10px; }
     .ir-bulkbar .btn { margin-right: 4px; margin-bottom: 4px; }
 </style>
@@ -61,6 +64,7 @@
                 'equipment' => $filters['equipment'],
                 'q' => $filters['q'],
                 'kind' => $filters['kind'] !== 'incident' ? $filters['kind'] : '',
+                'strict' => $filters['strict'] ? '1' : '',
             ];
             $cardBase = array_filter($cardBase, fn ($v) => $v !== '') + ['site' => ''];
             $cards = [
@@ -98,7 +102,15 @@
         {{-- ====== Bộ lọc ====== --}}
         <div class="box box-default">
             <div class="box-body">
+                @if ($filters['strict'])
+                    <div class="alert alert-info" style="padding:8px 12px; margin-bottom:10px">
+                        <i class="fas fa-info-circle" aria-hidden="true"></i>
+                        Đang chỉ hiện sự cố <strong>bắt đầu</strong> trong khoảng ngày đã chọn (không kèm sự cố cũ chưa xong), để khớp với số trong bảng rạp × tháng.
+                        <a href="{{ route('incident-reports.index', array_merge(request()->query(), ['strict' => null, 'site' => $filters['site']])) }}" class="btn btn-default btn-xs" style="margin-left:6px">Hiện cả sự cố cũ chưa xong</a>
+                    </div>
+                @endif
                 <form method="GET" action="{{ route('incident-reports.index') }}" class="form-inline ir-filters" id="ir-filter-form">
+                    @if ($filters['strict'])<input type="hidden" name="strict" value="1">@endif
                     <div class="form-group">
                         <label for="ir-month">Tháng</label>
                         <input type="month" id="ir-month" class="form-control input-sm"
@@ -214,16 +226,50 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                @php
+                                    // Same filters as the chart (except site/dates/status) so the list matches the number.
+                                    $heatBase = array_filter([
+                                        'hall' => $filters['hall'],
+                                        'equipment' => $filters['equipment'],
+                                        'q' => $filters['q'],
+                                        'kind' => $filters['kind'] !== 'incident' ? $filters['kind'] : '',
+                                    ], fn ($v) => $v !== '') + ['strict' => 1];
+                                    $heatLink = function (string $site, string $from, string $to) use ($heatBase) {
+                                        return route('incident-reports.index', $heatBase + ['site' => $site, 'from' => $from, 'to' => $to]).'#ir-list';
+                                    };
+                                    $monthFrom = fn ($key) => $key.'-01';
+                                    $monthTo = fn ($key) => \Carbon\Carbon::parse($key.'-01')->endOfMonth()->format('Y-m-d');
+                                    $firstKey = $trend['keys'][0];
+                                    $lastKey = end($trend['keys']);
+                                @endphp
                                 @foreach ($trend['sites'] as $i => $ts)
+                                    @php $linkable = $ts['site'] !== '(Chưa rõ site)'; @endphp
                                     <tr class="{{ $i >= $heatTop ? 'ir-heat-hidden' : '' }}">
                                         <td class="ir-heat-site">
-                                            <a href="{{ route('incident-reports.index', ['site' => $ts['site'], 'from' => $filters['from']->format('Y-m-d'), 'to' => $filters['to']->format('Y-m-d')]) }}">{{ $ts['site'] }}</a>
+                                            @if ($linkable)
+                                                <a href="{{ $heatLink($ts['site'], $monthFrom($firstKey), $monthTo($lastKey)) }}" title="Xem sự cố 12 tháng của {{ $ts['site'] }}">{{ $ts['site'] }}</a>
+                                            @else
+                                                {{ $ts['site'] }}
+                                            @endif
                                         </td>
-                                        @foreach ($ts['counts'] as $c)
+                                        @foreach ($ts['counts'] as $mi => $c)
                                             @php $alpha = $heatMax > 0 && $c > 0 ? round(0.12 + 0.68 * $c / $heatMax, 2) : 0; @endphp
-                                            <td style="{{ $c > 0 ? 'background-color: rgba(221,75,57,'.$alpha.');'.($alpha > 0.5 ? 'color:#fff;font-weight:600;' : '') : '' }}">{{ $c ?: '' }}</td>
+                                            <td style="{{ $c > 0 ? 'background-color: rgba(221,75,57,'.$alpha.');'.($alpha > 0.5 ? 'color:#fff;font-weight:600;' : '') : '' }}">
+                                                @if ($c > 0 && $linkable)
+                                                    <a href="{{ $heatLink($ts['site'], $monthFrom($trend['keys'][$mi]), $monthTo($trend['keys'][$mi])) }}" class="ir-heat-link"
+                                                       title="Xem {{ $c }} sự cố của {{ $ts['site'] }} tháng {{ $trend['labels'][$mi] }}">{{ $c }}</a>
+                                                @else
+                                                    {{ $c ?: '' }}
+                                                @endif
+                                            </td>
                                         @endforeach
-                                        <td><strong>{{ $ts['total'] }}</strong></td>
+                                        <td>
+                                            @if ($linkable)
+                                                <a href="{{ $heatLink($ts['site'], $monthFrom($firstKey), $monthTo($lastKey)) }}" class="ir-heat-link" title="Xem cả {{ $ts['total'] }} sự cố"><strong>{{ $ts['total'] }}</strong></a>
+                                            @else
+                                                <strong>{{ $ts['total'] }}</strong>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>

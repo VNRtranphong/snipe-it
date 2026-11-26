@@ -73,6 +73,10 @@ class IncidentReportRepository
             'q' => trim((string) ($input['q'] ?? '')),
             'kind' => in_array($input['kind'] ?? '', [self::KIND_MAINTENANCE, self::KIND_ALL], true)
                 ? $input['kind'] : self::KIND_INCIDENT,
+            // strict=1: only incidents that STARTED in the date range (no older
+            // open ones carried over). Used by the clickable heat-map cells so
+            // the list matches the number that was clicked.
+            'strict' => ! empty($input['strict']),
         ];
     }
 
