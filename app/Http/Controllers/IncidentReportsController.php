@@ -97,9 +97,10 @@ class IncidentReportsController extends Controller
     }
 
     /** Tra cứu thiết bị: separate page (data comes from inventory()). */
-    public function inventoryPage(): View
+    public function inventoryPage(InventoryRepository $inventory): View
     {
         return view('incident-reports.inventory', [
+            'overview' => $inventory->overview(),
             'inventoryCategories' => Category::where('category_type', 'asset')->orderBy('name')->get(['id', 'name']),
             'inventoryModels' => AssetModel::orderBy('name')->get(['id', 'name', 'model_number', 'category_id']),
         ]);

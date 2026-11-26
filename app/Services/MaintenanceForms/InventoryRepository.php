@@ -76,6 +76,104 @@ class InventoryRepository
         ];
     }
 
+    /** Equipment kinds shown on the overview (label from MaintenanceFormExporter::EQUIPMENT_LABELS). */
+    public const OVERVIEW_KINDS = ['Projector', 'Server', 'Processor'];
+
+    /**
+     * Tổng quan: sites, rooms per site and which Projector / Server /
+     * Processor models each site uses.
+     *
+     * @return array<string, mixed>
+     */
+    public function overview(): array
+    {
+        $rows = [];
+        Asset::query()
+            ->with(['model.category', 'location.parent', 'defaultLoc', 'assignedTo'])
+            ->select(['id', 'name', 'asset_tag', 'model_id', 'location_id', 'rtd_location_id', 'assigned_to', 'assigned_type', 'company_id'])
+            ->orderBy('id')
+            ->chunk(1000, function ($assets) use (&$rows) {
+                foreach ($assets as $asset) {
+                    $d = [
+                        'category' => (string) ($asset->model?->category?->name ?? ''),
+                        'model' => (string) ($asset->model?->name ?? ''),
+                        'asset_name' => (string) $asset->name,
+                    ];
+                    $kind = MaintenanceFormExporter::equipmentLabel($d);
+                    if (! in_array($kind, self::OVERVIEW_KINDS, true)) {
+                        continue;
+                    }
+                    [$site, $hall] = MaintenanceFormExporter::siteAndHall($asset);
+                    $rows[] = [
+                        'site' => $site,
+                        'hall' => $hall,
+                        'kind' => $kind,
+                        'model' => $d['model'] !== '' ? $d['model'] : '(Không rõ model)',
+                        'model_id' => $asset->model_id,
+                        'category_id' => $asset->model?->category_id,
+                    ];
+                }
+            });
+
+        return self::summarizeOverview($rows);
+    }
+
+    /**
+     * @param  list<array{site: string, hall: string, kind: string, model: string, model_id: int|null, category_id: int|null}>  $rows
+     * @return array{totals: array<string, int>, sites: list<array<string, mixed>>, unassigned: array<string, int>}
+     */
+    public static function summarizeOverview(array $rows): array
+    {
+        $sites = [];
+        $unassigned = array_fill_keys(self::OVERVIEW_KINDS, 0);
+        $totals = array_fill_keys(self::OVERVIEW_KINDS, 0);
+
+        foreach ($rows as $r) {
+            $totals[$r['kind']]++;
+            if ($r['site'] === '') {
+                $unassigned[$r['kind']]++;
+
+                continue;
+            }
+            $s = &$sites[$r['site']];
+            $s ??= ['site' => $r['site'], 'halls' => [], 'kinds' => array_fill_keys(self::OVERVIEW_KINDS, [])];
+            if ($r['hall'] !== '') {
+                $s['halls'][$r['hall']] = true;
+            }
+            $key = (string) ($r['model_id'] ?? $r['model']);
+            $s['kinds'][$r['kind']][$key] ??= ['model' => $r['model'], 'model_id' => $r['model_id'], 'category_id' => $r['category_id'], 'count' => 0];
+            $s['kinds'][$r['kind']][$key]['count']++;
+            unset($s);
+        }
+
+        $out = [];
+        foreach ($sites as $s) {
+            $halls = array_map('strval', array_keys($s['halls']));
+            natsort($halls);
+            $kinds = [];
+            $counts = [];
+            foreach ($s['kinds'] as $kind => $models) {
+                usort($models, fn ($a, $b) => $b['count'] <=> $a['count'] ?: strnatcasecmp($a['model'], $b['model']));
+                $kinds[$kind] = array_values($models);
+                $counts[$kind] = array_sum(array_column($models, 'count'));
+            }
+            $out[] = [
+                'site' => $s['site'],
+                'rooms' => count($halls),
+                'halls' => array_values($halls),
+                'kinds' => $kinds,
+                'counts' => $counts,
+            ];
+        }
+        usort($out, fn ($a, $b) => strnatcasecmp($a['site'], $b['site']));
+
+        return [
+            'totals' => ['sites' => count($out), 'rooms' => array_sum(array_column($out, 'rooms'))] + $totals,
+            'sites' => $out,
+            'unassigned' => $unassigned,
+        ];
+    }
+
     /**
      * Every asset in the whole system (any model / category) whose serial
      * equals one of the serials in $rows, compared trimmed + upper-case.

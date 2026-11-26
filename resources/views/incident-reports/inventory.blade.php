@@ -22,6 +22,18 @@
     #ir-inventory .ir-dup-note { display: block; color: #dd4b39; font-size: 11px; margin-top: 2px; }
     #ir-inv-dups ul { margin: 6px 0 0; padding-left: 18px; }
     #ir-inv-dups li { margin-bottom: 4px; }
+    #ir-overview .info-box { min-height: 70px; margin-bottom: 12px; }
+    #ir-overview .info-box-icon { height: 70px; line-height: 70px; width: 70px; font-size: 30px; }
+    #ir-overview .info-box-content { margin-left: 70px; }
+    #ir-overview .info-box-number { font-size: 22px; }
+    .ir-ov-chart-wrap { position: relative; }
+    .ir-ov-table td { vertical-align: top !important; }
+    .ir-ov-table .ir-ov-halls { font-size: 11px; opacity: .7; display: block; }
+    .ir-ov-model { display: inline-block; margin: 0 4px 4px 0; padding: 2px 7px; border-radius: 3px;
+                   border: 1px solid rgba(60,141,188,.45); font-size: 12px; white-space: nowrap; text-decoration: none !important; }
+    .ir-ov-model:hover { background: rgba(60,141,188,.18); }
+    .ir-ov-model b { margin-left: 3px; }
+    .ir-ov-none { opacity: .45; font-size: 12px; }
 </style>
 @endpush
 
@@ -100,11 +112,118 @@
             </div>
         </div>
 
+        {{-- ====== Tổng quan (ẩn khi đang tra cứu) ====== --}}
+        @php
+            $ovKinds = \App\Services\MaintenanceForms\InventoryRepository::OVERVIEW_KINDS;
+            $ovIcons = ['Projector' => 'fa-video', 'Server' => 'fa-server', 'Processor' => 'fa-sliders-h'];
+            $ovColors = ['Projector' => 'bg-purple', 'Server' => 'bg-yellow', 'Processor' => 'bg-green'];
+            $ovT = $overview['totals'];
+        @endphp
+        <div id="ir-overview">
+            <div class="row">
+                <div class="col-lg-2 col-sm-4 col-xs-6">
+                    <div class="info-box">
+                        <span class="info-box-icon bg-blue"><i class="fas fa-building" aria-hidden="true"></i></span>
+                        <div class="info-box-content"><span class="info-box-text">Số rạp</span><span class="info-box-number">{{ number_format($ovT['sites']) }}</span></div>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-sm-4 col-xs-6">
+                    <div class="info-box">
+                        <span class="info-box-icon bg-aqua"><i class="fas fa-door-open" aria-hidden="true"></i></span>
+                        <div class="info-box-content"><span class="info-box-text">Số phòng</span><span class="info-box-number">{{ number_format($ovT['rooms']) }}</span></div>
+                    </div>
+                </div>
+                @foreach ($ovKinds as $k)
+                    <div class="col-lg-2 col-sm-4 col-xs-6">
+                        <div class="info-box">
+                            <span class="info-box-icon {{ $ovColors[$k] }}"><i class="fas {{ $ovIcons[$k] }}" aria-hidden="true"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">{{ $k }}</span>
+                                <span class="info-box-number">{{ number_format($ovT[$k]) }}</span>
+                                @if ($overview['unassigned'][$k] > 0)
+                                    <span class="progress-description" style="font-size:12px">{{ $overview['unassigned'][$k] }} chưa gán rạp</span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
+            @if (count($overview['sites']))
+                <div class="box box-default">
+                    <div class="box-header with-border">
+                        <h2 class="box-title"><i class="fas fa-chart-bar" aria-hidden="true"></i> Số phòng và thiết bị theo rạp</h2>
+                    </div>
+                    <div class="box-body">
+                        <div class="ir-ov-chart-wrap" style="height: {{ max(260, 28 * count($overview['sites']) + 60) }}px">
+                            <canvas id="ir-ov-chart" role="img" aria-label="Số phòng, projector, server, processor theo rạp"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="box box-default">
+                    <div class="box-header with-border">
+                        <h2 class="box-title"><i class="fas fa-table" aria-hidden="true"></i> Rạp đang dùng thiết bị gì</h2>
+                    </div>
+                    <div class="box-body">
+                        <p class="text-muted" style="font-size:12px; margin-top:0">Bấm vào một model để xem chi tiết từng máy: phòng nào, serial bao nhiêu.</p>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-condensed ir-ov-table">
+                                <thead>
+                                    <tr>
+                                        <th>Rạp</th>
+                                        <th class="text-center">Số phòng</th>
+                                        @foreach ($ovKinds as $k)
+                                            <th>{{ $k }}</th>
+                                        @endforeach
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($overview['sites'] as $os)
+                                        <tr>
+                                            <td><strong>{{ $os['site'] }}</strong></td>
+                                            <td class="text-center">
+                                                <strong>{{ $os['rooms'] ?: '—' }}</strong>
+                                                @if ($os['rooms'])
+                                                    <span class="ir-ov-halls">{{ implode(', ', $os['halls']) }}</span>
+                                                @endif
+                                            </td>
+                                            @foreach ($ovKinds as $k)
+                                                <td>
+                                                    @forelse ($os['kinds'][$k] as $m)
+                                                        @if ($m['model_id'])
+                                                            <a href="#" class="ir-ov-model" data-model-id="{{ $m['model_id'] }}" data-category-id="{{ $m['category_id'] }}"
+                                                               title="Xem chi tiết {{ $m['model'] }}">{{ $m['model'] }}<b>×{{ $m['count'] }}</b></a>
+                                                        @else
+                                                            <span class="ir-ov-model">{{ $m['model'] }}<b>×{{ $m['count'] }}</b></span>
+                                                        @endif
+                                                    @empty
+                                                        <span class="ir-ov-none">—</span>
+                                                    @endforelse
+                                                </td>
+                                            @endforeach
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-muted" style="font-size:12px; margin:6px 0 0">
+                            Số phòng = số Hall khác nhau có Projector / Server / Processor (gồm cả phòng đoán từ tên thiết bị).
+                            Loại thiết bị nhận theo Category, rồi theo tên model / tên thiết bị.
+                        </p>
+                    </div>
+                </div>
+            @else
+                <div class="box box-default"><div class="box-body text-muted">Chưa có Projector / Server / Processor nào được gán rạp.</div></div>
+            @endif
+        </div>
+
     </div>
 </div>
 @stop
 
 @section('moar_scripts')
+<script src="{{ url(mix('js/dist/Chart.min.js')) }}"></script>
 <script nonce="{{ csrf_token() }}">
     // ====== Tra cứu thiết bị ======
     (function () {
@@ -157,7 +276,11 @@
             return p.join('&');
         }
 
+        var overview = document.getElementById('ir-overview');
+        function showOverview(show) { if (overview) { overview.style.display = show ? '' : 'none'; } }
+
         function reset() {
+            showOverview(true);
             current = null; activeSite = ''; onlyDups = false;
             result.style.display = 'none';
             dupsBox.style.display = 'none';
@@ -171,6 +294,7 @@
             var p = params();
             if (!p) { reset(); return; }
             var mine = ++request;
+            showOverview(false);
             message.style.display = '';
             message.textContent = 'Đang tải…';
             fetch(dataUrl + '?' + p, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
@@ -293,6 +417,53 @@
         catSel.addEventListener('change', syncUrl);
         modelSel.addEventListener('change', syncUrl);
         closeBtn.addEventListener('click', syncUrl);
+
+        // Overview: click a model chip => open its detail.
+        if (overview) {
+            overview.addEventListener('click', function (e) {
+                var a = e.target.closest('a.ir-ov-model');
+                if (!a) { return; }
+                e.preventDefault();
+                catSel.value = a.getAttribute('data-category-id') || '';
+                filterModels();
+                modelSel.value = a.getAttribute('data-model-id');
+                syncUrl();
+                load();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+
+        // Overview chart: rooms + equipment per site (horizontal bars).
+        var ovCanvas = document.getElementById('ir-ov-chart');
+        if (ovCanvas && typeof Chart !== 'undefined') {
+            var ov = @json($overview['sites']);
+            var dark = (typeof isDark === 'function') && isDark();
+            var grid = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+            Chart.defaults.global.defaultFontColor = dark ? '#cccccc' : '#666666';
+            var col = function (k) { return ov.map(function (s) { return s.counts[k] || 0; }); };
+            new Chart(ovCanvas.getContext('2d'), {
+                type: 'horizontalBar',
+                data: {
+                    labels: ov.map(function (s) { return s.site; }),
+                    datasets: [
+                        { label: 'Số phòng', data: ov.map(function (s) { return s.rooms; }), backgroundColor: 'rgba(60,141,188,0.85)' },
+                        { label: 'Projector', data: col('Projector'), backgroundColor: 'rgba(96,92,168,0.8)' },
+                        { label: 'Server', data: col('Server'), backgroundColor: 'rgba(243,156,18,0.8)' },
+                        { label: 'Processor', data: col('Processor'), backgroundColor: 'rgba(0,166,90,0.8)' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    legend: { position: 'bottom' },
+                    tooltips: { mode: 'index', intersect: false },
+                    scales: {
+                        xAxes: [{ ticks: { beginAtZero: true, precision: 0 }, gridLines: { color: grid } }],
+                        yAxes: [{ gridLines: { display: false }, barPercentage: 0.9, categoryPercentage: 0.85 }]
+                    }
+                }
+            });
+        }
     })();
 </script>
 @stop
