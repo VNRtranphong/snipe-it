@@ -472,7 +472,7 @@
                         <div class="table-responsive">
                             <table class="table table-striped table-hover table-condensed">
                                 <thead>
-                                    <tr><th>Rạp</th><th>Phòng</th><th>Thiết bị</th><th>Model</th><th>Mã TS</th><th>Hạn certificate</th><th>Còn lại</th></tr>
+                                    <tr><th>Rạp</th><th>Phòng</th><th>Thiết bị</th><th>Model</th><th>Hạn certificate</th><th>Còn lại</th></tr>
                                 </thead>
                                 <tbody>
                                     @foreach ($certs['rows'] as $c)
@@ -481,7 +481,6 @@
                                             <td>{{ $c['hall'] !== '' ? 'Hall '.$c['hall'].($c['hall_guessed'] ? '*' : '') : '' }}</td>
                                             <td><a href="{{ url('hardware/'.$c['id']) }}">{{ $c['name'] ?: $c['asset_tag'] }}</a></td>
                                             <td>{{ $c['model'] }}</td>
-                                            <td>{{ $c['asset_tag'] }}</td>
                                             <td style="white-space:nowrap">{{ $c['expires_label'] }}</td>
                                             <td style="white-space:nowrap">
                                                 @if ($c['state'] === 'expired')
