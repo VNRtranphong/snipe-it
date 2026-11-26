@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Maintenance;
 use App\Services\MaintenanceForms\IncidentDocumentService;
 use App\Services\MaintenanceForms\IncidentReportRepository;
+use App\Services\MaintenanceForms\IncidentStatsService;
 use App\Services\MaintenanceForms\IncidentSummaryExporter;
 use App\Services\MaintenanceForms\InventoryRepository;
 use Carbon\Carbon;
@@ -64,6 +65,34 @@ class IncidentReportsController extends Controller
             'options' => IncidentReportRepository::options($inRange, $filters['site']),
             'truncated' => count($inRange) >= IncidentReportRepository::MAX_ROWS,
             'overdueHours' => IncidentReportRepository::OVERDUE_HOURS,
+        ]);
+    }
+
+    /**
+     * Thống kê sự cố: year-over-year comparison.
+     * ?year=2026 &span=same|full &metric=incidents|maintenance|cancelled|cancelled_over24|overdue
+     */
+    public function stats(Request $request): View
+    {
+        $now = Carbon::now();
+        $currentYear = (int) $now->format('Y');
+        $year = (int) $request->query('year', $currentYear);
+        if ($year < 2000 || $year > $currentYear) {
+            $year = $currentYear;
+        }
+        $sameSpan = $request->query('span', 'same') !== 'full';
+        $metric = (string) $request->query('metric', 'incidents');
+
+        $rows = $this->repository->rowsInRange([
+            'from' => Carbon::create($year - 2, 1, 1, 0, 0, 0),
+            'to' => Carbon::create($year, 12, 31, 23, 59, 59),
+        ], $now, false, 50000);
+
+        return view('incident-reports.stats', [
+            'stats' => IncidentStatsService::build($rows, $year, $now, $sameSpan, $metric),
+            'metrics' => IncidentStatsService::METRICS,
+            'yearOptions' => range($currentYear, $currentYear - 5),
+            'cutoff' => $now,
         ]);
     }
 

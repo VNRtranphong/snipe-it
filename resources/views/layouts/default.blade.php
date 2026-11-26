@@ -584,6 +584,14 @@
                                 </a>
                             </li>
 
+                            {{-- Thống kê sự cố: so sánh theo năm --}}
+                            <li{!! (request()->is('incident-stats*') ? ' class="active" aria-current="page"' : '') !!}>
+                                <a href="{{ route('incident-stats.index') }}">
+                                    <i class="fas fa-chart-line fa-fw" aria-hidden="true"></i>
+                                    <span>Thống kê sự cố</span>
+                                </a>
+                            </li>
+
                             {{-- Ngân sách & Chi phí: separate app on port 8080 of the same host (same target as the top-bar icon from budget-link.blade.php) --}}
                             <li>
                                 <a href="{{ 'http://'.request()->getHost().':8080/' }}">

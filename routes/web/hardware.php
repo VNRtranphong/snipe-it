@@ -294,6 +294,14 @@ Route::group(['prefix' => 'incident-reports', 'middleware' => ['auth']], functio
         ->name('incident-reports.unlock');
 });
 
+// Thống kê sự cố: so sánh theo năm (open to every logged-in user).
+Route::get('incident-stats', [IncidentReportsController::class, 'stats'])
+    ->name('incident-stats.index')
+    ->middleware(['auth'])
+    ->breadcrumbs(fn (Trail $trail) => $trail->parent('home', route('home'))
+        ->push('Thống kê sự cố', route('incident-stats.index'))
+    );
+
 // Tra cứu thiết bị theo Model / Category (open to every logged-in user).
 Route::get('equipment-lookup', [IncidentReportsController::class, 'inventoryPage'])
     ->name('equipment-lookup.index')
