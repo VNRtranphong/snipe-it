@@ -12,6 +12,7 @@ use App\Services\MaintenanceForms\IncidentReportRepository;
 use App\Services\MaintenanceForms\IncidentStatsService;
 use App\Services\MaintenanceForms\IncidentSummaryExporter;
 use App\Services\MaintenanceForms\InventoryRepository;
+use App\Services\MaintenanceForms\CertificateReportService;
 use App\Services\MaintenanceForms\LicenseReportService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -62,6 +63,8 @@ class IncidentReportsController extends Controller
             'docsReady' => $this->documents->ready(),
             // Báo cáo License: only for users allowed to see licenses in Snipe-IT.
             'licenses' => ($user?->can('view', License::class) ?? false) ? app(LicenseReportService::class)->report() : null,
+            // Certificate: custom field "Hạn certificate" on assets, warn 3 months ahead.
+            'certs' => $this->certificateReport(),
             'canLock' => ($user?->can('update', Asset::class) ?? false) && $this->documents->ready(),
             'canUnlock' => (bool) $user?->isSuperUser(),
             'trend' => $this->trendFor($filters),
@@ -98,6 +101,29 @@ class IncidentReportsController extends Controller
             'yearOptions' => range($currentYear, $currentYear - 5),
             'cutoff' => $now,
         ]);
+    }
+
+    /** Certificate report; never breaks the page if the field is missing / odd. */
+    private function certificateReport(): ?array
+    {
+        try {
+            return app(CertificateReportService::class)->report();
+        } catch (\Throwable $e) {
+            Log::warning('Certificate report failed: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
+    /** Excel: certificate sắp hết hạn. */
+    public function certificatesExport(): BinaryFileResponse
+    {
+        $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'certs_'.Str::random(16).'.xlsx';
+        CertificateReportService::export(app(CertificateReportService::class)->report(), $path);
+
+        return response()
+            ->download($path, 'CertificateSapHetHan_'.Carbon::now()->format('d-m-Y').'.xlsx')
+            ->deleteFileAfterSend(true);
     }
 
     /** Excel: license cần mua tiếp (per cinema, quantity = rooms). */
