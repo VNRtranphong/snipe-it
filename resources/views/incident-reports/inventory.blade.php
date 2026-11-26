@@ -156,6 +156,21 @@
                 @endforeach
             </div>
 
+            @php
+                $brokenList = $overview['broken'] ?? [];
+                $offsiteList = $overview['offsite'] ?? [];
+                $offsiteCount = array_sum(array_map(fn ($g) => count($g['items']), $offsiteList));
+            @endphp
+            @if (count($brokenList) || $offsiteCount)
+                <p class="text-muted" style="font-size:12px; margin:0 0 12px; clear:both; width:100%">
+                    Số liệu trên chỉ tính thiết bị đang ở rạp. Không tính
+                    @if (count($brokenList))<a href="#ir-ov-broken">{{ count($brokenList) }} thiết bị hư không thể sửa chữa</a>@endif
+                    @if (count($brokenList) && $offsiteCount) và @endif
+                    @if ($offsiteCount)<a href="#ir-ov-offsite">{{ $offsiteCount }} thiết bị ở {{ implode(', ', array_column($offsiteList, 'site')) }}</a>@endif
+                    – xem bảng riêng bên dưới.
+                </p>
+            @endif
+
             @if (count($overview['sites']))
                 <div class="row">
                     @foreach ($ovKinds as $k)
@@ -256,6 +271,82 @@
             @else
                 <div class="box box-default"><div class="box-body text-muted">Chưa có Projector / Server / Processor nào được gán rạp.</div></div>
             @endif
+
+            {{-- ====== Báo cáo riêng: hư không thể sửa chữa ====== --}}
+            <div class="box box-danger" id="ir-ov-broken">
+                <div class="box-header with-border">
+                    <h2 class="box-title"><i class="fas fa-ban" aria-hidden="true"></i> Thiết bị hư không thể sửa chữa ({{ count($brokenList) }})</h2>
+                </div>
+                <div class="box-body">
+                    @if (count($brokenList))
+                        <p class="text-muted" style="font-size:12px; margin-top:0">Các thiết bị có Status Label "hư không thể sửa chữa". Không tính vào số thiết bị và số đủ/thiếu của rạp.</p>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-condensed table-hover">
+                                <thead><tr><th>#</th><th>Rạp / nơi để</th><th>Phòng</th><th>Loại</th><th>Tên thiết bị</th><th>Model</th><th>Serial</th><th>Mã TS</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    @foreach ($brokenList as $i => $b)
+                                        <tr>
+                                            <td>{{ $i + 1 }}</td>
+                                            <td>{{ $b['site'] ?: \App\Services\MaintenanceForms\InventoryRepository::NO_SITE }}</td>
+                                            <td>{{ $b['hall'] !== '' ? 'Hall '.$b['hall'].(! empty($b['hall_guessed']) ? '*' : '') : '' }}</td>
+                                            <td>{{ $b['kind'] }}</td>
+                                            <td><a href="{{ url('hardware/'.$b['id']) }}">{{ $b['name'] ?: $b['asset_tag'] }}</a></td>
+                                            <td>{{ $b['model'] }}</td>
+                                            <td><code>{{ $b['serial'] }}</code></td>
+                                            <td>{{ $b['asset_tag'] }}</td>
+                                            <td><span class="label label-danger">{{ $b['status'] }}</span></td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <p class="text-muted" style="margin:0">Không có Projector / Server / Processor nào mang Status Label "hư không thể sửa chữa".</p>
+                    @endif
+                </div>
+            </div>
+
+            {{-- ====== Báo cáo riêng: VP HO / MEP / Projection ====== --}}
+            <div class="box box-default" id="ir-ov-offsite">
+                <div class="box-header with-border">
+                    <h2 class="box-title"><i class="fas fa-warehouse" aria-hidden="true"></i> Thiết bị ở văn phòng / kho ({{ $offsiteCount }})</h2>
+                </div>
+                <div class="box-body">
+                    @if ($offsiteCount)
+                        <p class="text-muted" style="font-size:12px; margin-top:0">Thiết bị ở các location không phải rạp (VP HO, MEP, Projection), liệt kê riêng từng nơi, không gộp vào số của rạp.</p>
+                        @foreach ($offsiteList as $g)
+                            <h4 style="margin:14px 0 6px">
+                                {{ $g['site'] }}
+                                <small>
+                                    @foreach ($ovKinds as $k)
+                                        @if ($g['counts'][$k])<span class="label label-default" style="margin-left:4px">{{ $k }}: {{ $g['counts'][$k] }}</span>@endif
+                                    @endforeach
+                                </small>
+                            </h4>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-condensed table-hover">
+                                    <thead><tr><th>#</th><th>Loại</th><th>Tên thiết bị</th><th>Model</th><th>Serial</th><th>Mã TS</th><th>Status</th></tr></thead>
+                                    <tbody>
+                                        @foreach ($g['items'] as $i => $it)
+                                            <tr>
+                                                <td>{{ $i + 1 }}</td>
+                                                <td>{{ $it['kind'] }}</td>
+                                                <td><a href="{{ url('hardware/'.$it['id']) }}">{{ $it['name'] ?: $it['asset_tag'] }}</a></td>
+                                                <td>{{ $it['model'] }}</td>
+                                                <td><code>{{ $it['serial'] }}</code></td>
+                                                <td>{{ $it['asset_tag'] }}</td>
+                                                <td>{{ $it['status'] }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endforeach
+                    @else
+                        <p class="text-muted" style="margin:0">Không có Projector / Server / Processor nào ở VP HO, MEP, Projection.</p>
+                    @endif
+                </div>
+            </div>
         </div>
 
     </div>
@@ -414,7 +505,7 @@
                     + '<td>' + esc(model) + '</td>'
                     + '<td><code>' + esc(r.serial) + '</code>' + dupNote + '</td>'
                     + '<td>' + esc(r.asset_tag) + '</td>'
-                    + '<td>' + esc(r.status) + '</td>'
+                    + '<td>' + (r.broken ? '<span class="label label-danger" title="Hư không thể sửa chữa">' + esc(r.status) + '</span>' : esc(r.status)) + '</td>'
                     + '<td class="text-center">' + (r.incidents ? esc(r.incidents) : '') + '</td>'
                     + '</tr>';
             }).join('') : '<tr><td colspan="9" class="text-center text-muted">Không có thiết bị nào.</td></tr>';

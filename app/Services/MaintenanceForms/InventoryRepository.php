@@ -61,6 +61,7 @@ class InventoryRepository
                 'model_number' => (string) ($asset->model?->model_number ?? ''),
                 'category' => (string) ($asset->model?->category?->name ?? ''),
                 'status' => (string) ($asset->status?->name ?? ''),
+                'broken' => self::isBrokenStatus($asset->status?->name),
                 'incidents' => (int) ($asset->maintenances_count ?? 0),
             ];
         }
@@ -87,6 +88,25 @@ class InventoryRepository
      */
     public const OVERVIEW_EXCLUDED_SITES = ['vp ho', 'mep', 'projection'];
 
+    /**
+     * Status labels meaning "broken, cannot be repaired" – such assets are
+     * reported separately and never counted as installed equipment.
+     * Ascii-lowercased substrings of the status label name.
+     */
+    public const BROKEN_STATUS_PATTERNS = ['khong the sua', 'khong sua duoc', 'unrepairable', 'beyond repair'];
+
+    public static function isBrokenStatus(?string $status): bool
+    {
+        $n = \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii((string) $status));
+        foreach (self::BROKEN_STATUS_PATTERNS as $p) {
+            if ($p !== '' && str_contains($n, $p)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function isExcludedSite(string $site): bool
     {
         $key = trim(preg_replace('/\s+/', ' ', \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii($site))));
@@ -112,7 +132,7 @@ class InventoryRepository
     public function cachedOverview(bool $refresh = false): array
     {
         $user = auth()->user();
-        $key = 'equipment-lookup-overview:v3:'.($user?->isSuperUser() ? 'su' : 'c'.($user?->company_id ?? 0));
+        $key = 'equipment-lookup-overview:v4:'.($user?->isSuperUser() ? 'su' : 'c'.($user?->company_id ?? 0));
 
         if ($refresh) {
             Cache::forget($key);
@@ -166,17 +186,24 @@ class InventoryRepository
                 'location.parent',
                 'defaultLoc',
                 'company:id,name',
+                'status:id,name',
                 'assignedTo' => fn ($morph) => $morph->morphWith([Location::class => ['parent']]),
             ])
-            ->select(['id', 'name', 'model_id', 'location_id', 'rtd_location_id', 'assigned_to', 'assigned_type', 'company_id'])
+            ->select(['id', 'name', 'asset_tag', 'serial', 'status_id', 'model_id', 'location_id', 'rtd_location_id', 'assigned_to', 'assigned_type', 'company_id'])
             ->orderBy('id')
             ->chunk(1000, function ($assets) use (&$rows, $modelKinds) {
                 foreach ($assets as $asset) {
                     [$kind, $modelName, $categoryId] = $modelKinds[$asset->model_id];
-                    [$site, $hall] = MaintenanceFormExporter::siteAndHall($asset);
+                    [$site, $hall, $hallGuessed] = MaintenanceFormExporter::siteAndHall($asset);
                     $rows[] = [
+                        'id' => $asset->id,
+                        'name' => (string) $asset->name,
+                        'asset_tag' => (string) $asset->asset_tag,
+                        'serial' => (string) $asset->serial,
+                        'status' => (string) ($asset->status?->name ?? ''),
                         'site' => $site,
                         'hall' => $hall,
+                        'hall_guessed' => (bool) $hallGuessed,
                         'kind' => $kind,
                         'model' => $modelName !== '' ? $modelName : '(Không rõ model)',
                         'model_id' => $asset->model_id,
@@ -219,9 +246,20 @@ class InventoryRepository
         $totals = array_fill_keys(self::OVERVIEW_KINDS, 0);
 
         $modelTotals = array_fill_keys(self::OVERVIEW_KINDS, []);
+        $broken = [];
+        $offsite = [];
 
         foreach ($rows as $r) {
+            // 1. Broken beyond repair: separate list, never counted.
+            if (self::isBrokenStatus($r['status'] ?? '')) {
+                $broken[] = $r;
+
+                continue;
+            }
+            // 2. Office / non-cinema locations (VP HO, MEP …): own list per location.
             if ($r['site'] !== '' && self::isExcludedSite($r['site'])) {
+                $offsite[$r['site']][] = $r;
+
                 continue;
             }
             $totals[$r['kind']]++;
@@ -271,11 +309,31 @@ class InventoryRepository
             $modelTotals[$kind] = $list;
         }
 
+        $byPlace = function (array $a, array $b) {
+            return strnatcasecmp($a['site'] ?? '', $b['site'] ?? '')
+                ?: strnatcasecmp($a['hall'] ?? '', $b['hall'] ?? '')
+                ?: strnatcasecmp($a['kind'] ?? '', $b['kind'] ?? '')
+                ?: strnatcasecmp($a['name'] ?? '', $b['name'] ?? '');
+        };
+        usort($broken, $byPlace);
+        ksort($offsite, SORT_NATURAL | SORT_FLAG_CASE);
+        $offsiteOut = [];
+        foreach ($offsite as $place => $list) {
+            usort($list, $byPlace);
+            $counts = array_fill_keys(self::OVERVIEW_KINDS, 0);
+            foreach ($list as $x) {
+                $counts[$x['kind']]++;
+            }
+            $offsiteOut[] = ['site' => $place, 'counts' => $counts, 'items' => $list];
+        }
+
         return [
             'totals' => ['sites' => count($out), 'rooms' => array_sum(array_column($out, 'rooms'))] + $totals,
             'sites' => $out,
             'unassigned' => $unassigned,
             'models' => $modelTotals,
+            'broken' => $broken,
+            'offsite' => $offsiteOut,
         ];
     }
 
