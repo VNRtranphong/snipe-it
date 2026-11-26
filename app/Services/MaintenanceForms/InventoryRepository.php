@@ -93,7 +93,14 @@ class InventoryRepository
      * reported separately and never counted as installed equipment.
      * Ascii-lowercased substrings of the status label name.
      */
-    public const BROKEN_STATUS_PATTERNS = ['khong the sua', 'khong sua duoc', 'unrepairable', 'beyond repair'];
+    public const BROKEN_STATUS_PATTERNS = [
+        'khong the su dung',   // "Hư - không thể sử dụng"
+        'khong the sua',
+        'khong sua duoc',
+        'thanh ly',            // "Đã thanh lý Hủy"
+        'unrepairable',
+        'beyond repair',
+    ];
 
     public static function isBrokenStatus(?string $status): bool
     {
@@ -132,7 +139,7 @@ class InventoryRepository
     public function cachedOverview(bool $refresh = false): array
     {
         $user = auth()->user();
-        $key = 'equipment-lookup-overview:v4:'.($user?->isSuperUser() ? 'su' : 'c'.($user?->company_id ?? 0));
+        $key = 'equipment-lookup-overview:v5:'.($user?->isSuperUser() ? 'su' : 'c'.($user?->company_id ?? 0));
 
         if ($refresh) {
             Cache::forget($key);

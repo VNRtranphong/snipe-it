@@ -164,7 +164,7 @@
             @if (count($brokenList) || $offsiteCount)
                 <p class="text-muted" style="font-size:12px; margin:0 0 12px; clear:both; width:100%">
                     Số liệu trên chỉ tính thiết bị đang ở rạp. Không tính
-                    @if (count($brokenList))<a href="#ir-ov-broken">{{ count($brokenList) }} thiết bị hư không thể sửa chữa</a>@endif
+                    @if (count($brokenList))<a href="#ir-ov-broken">{{ count($brokenList) }} thiết bị hư không thể sử dụng / đã thanh lý</a>@endif
                     @if (count($brokenList) && $offsiteCount) và @endif
                     @if ($offsiteCount)<a href="#ir-ov-offsite">{{ $offsiteCount }} thiết bị ở {{ implode(', ', array_column($offsiteList, 'site')) }}</a>@endif
                     – xem bảng riêng bên dưới.
@@ -275,11 +275,11 @@
             {{-- ====== Báo cáo riêng: hư không thể sửa chữa ====== --}}
             <div class="box box-danger" id="ir-ov-broken">
                 <div class="box-header with-border">
-                    <h2 class="box-title"><i class="fas fa-ban" aria-hidden="true"></i> Thiết bị hư không thể sửa chữa ({{ count($brokenList) }})</h2>
+                    <h2 class="box-title"><i class="fas fa-ban" aria-hidden="true"></i> Thiết bị hư không thể sử dụng / đã thanh lý ({{ count($brokenList) }})</h2>
                 </div>
                 <div class="box-body">
                     @if (count($brokenList))
-                        <p class="text-muted" style="font-size:12px; margin-top:0">Các thiết bị có Status Label "hư không thể sửa chữa". Không tính vào số thiết bị và số đủ/thiếu của rạp.</p>
+                        <p class="text-muted" style="font-size:12px; margin-top:0">Các thiết bị có Status Label "Hư - không thể sử dụng" hoặc "Đã thanh lý Hủy". Không tính vào số thiết bị và số đủ/thiếu của rạp.</p>
                         <div class="table-responsive">
                             <table class="table table-striped table-condensed table-hover">
                                 <thead><tr><th>#</th><th>Rạp / nơi để</th><th>Phòng</th><th>Loại</th><th>Tên thiết bị</th><th>Model</th><th>Serial</th><th>Mã TS</th><th>Status</th></tr></thead>
@@ -301,7 +301,7 @@
                             </table>
                         </div>
                     @else
-                        <p class="text-muted" style="margin:0">Không có Projector / Server / Processor nào mang Status Label "hư không thể sửa chữa".</p>
+                        <p class="text-muted" style="margin:0">Không có Projector / Server / Processor nào mang Status Label "Hư - không thể sử dụng" hoặc "Đã thanh lý Hủy".</p>
                     @endif
                 </div>
             </div>
@@ -505,7 +505,7 @@
                     + '<td>' + esc(model) + '</td>'
                     + '<td><code>' + esc(r.serial) + '</code>' + dupNote + '</td>'
                     + '<td>' + esc(r.asset_tag) + '</td>'
-                    + '<td>' + (r.broken ? '<span class="label label-danger" title="Hư không thể sửa chữa">' + esc(r.status) + '</span>' : esc(r.status)) + '</td>'
+                    + '<td>' + (r.broken ? '<span class="label label-danger" title="Hư - không thể sử dụng / đã thanh lý">' + esc(r.status) + '</span>' : esc(r.status)) + '</td>'
                     + '<td class="text-center">' + (r.incidents ? esc(r.incidents) : '') + '</td>'
                     + '</tr>';
             }).join('') : '<tr><td colspan="9" class="text-center text-muted">Không có thiết bị nào.</td></tr>';
