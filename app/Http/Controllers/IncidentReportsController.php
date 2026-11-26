@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Asset;
 use App\Models\AssetModel;
 use App\Models\Category;
+use App\Models\License;
 use App\Models\Maintenance;
 use App\Services\MaintenanceForms\IncidentDocumentService;
 use App\Services\MaintenanceForms\IncidentReportRepository;
 use App\Services\MaintenanceForms\IncidentStatsService;
 use App\Services\MaintenanceForms\IncidentSummaryExporter;
 use App\Services\MaintenanceForms\InventoryRepository;
+use App\Services\MaintenanceForms\LicenseReportService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -58,6 +60,8 @@ class IncidentReportsController extends Controller
             'rows' => $rows,
             'docs' => $this->documents->findMany(array_map(fn ($r) => (int) $r['id'], $rows)),
             'docsReady' => $this->documents->ready(),
+            // Báo cáo License: only for users allowed to see licenses in Snipe-IT.
+            'licenses' => ($user?->can('view', License::class) ?? false) ? app(LicenseReportService::class)->report() : null,
             'canLock' => ($user?->can('update', Asset::class) ?? false) && $this->documents->ready(),
             'canUnlock' => (bool) $user?->isSuperUser(),
             'trend' => $this->trendFor($filters),
@@ -94,6 +98,19 @@ class IncidentReportsController extends Controller
             'yearOptions' => range($currentYear, $currentYear - 5),
             'cutoff' => $now,
         ]);
+    }
+
+    /** Excel: license cần mua tiếp (per cinema, quantity = rooms). */
+    public function licensesExport(Request $request, LicenseReportService $licenses): BinaryFileResponse
+    {
+        $this->authorize('view', License::class);
+
+        $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'licenses_'.Str::random(16).'.xlsx';
+        LicenseReportService::exportPurchase($licenses->report(), $path);
+
+        return response()
+            ->download($path, 'LicenseCanMua_'.Carbon::now()->format('d-m-Y').'.xlsx')
+            ->deleteFileAfterSend(true);
     }
 
     /** Tra cứu thiết bị: separate page (data comes from inventory()). */

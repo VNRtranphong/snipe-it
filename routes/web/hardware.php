@@ -278,6 +278,8 @@ Route::group(['prefix' => 'incident-reports', 'middleware' => ['auth']], functio
         );
     Route::get('summary', [IncidentReportsController::class, 'summary'])
         ->name('incident-reports.summary');
+    Route::get('licenses/export', [IncidentReportsController::class, 'licensesExport'])
+        ->name('incident-reports.licenses.export');
     Route::get('inventory', [IncidentReportsController::class, 'inventory'])
         ->name('incident-reports.inventory');
     Route::get('inventory/export', [IncidentReportsController::class, 'inventoryExport'])

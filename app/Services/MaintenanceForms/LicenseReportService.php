@@ -1,0 +1,395 @@
+<?php
+
+namespace App\Services\MaintenanceForms;
+
+use App\Models\Asset;
+use App\Models\License;
+use App\Models\Location;
+use Carbon\Carbon;
+use Illuminate\Support\Str;
+
+/**
+ * "Báo cáo License" on the Báo cáo sự cố page.
+ *
+ *  - Licenses that are expired or end within SOON_DAYS.
+ *  - Purchase plan: a license is bought per cinema, quantity = number of
+ *    rooms of that cinema. Example: "AAM ND" belongs to Nguyễn Du which
+ *    has 5 rooms => buy 1 license "AAM" for Nguyễn Du, quantity 5 rooms.
+ *
+ * Snipe-IT licenses have no location field, so the cinema is found in
+ * this order (the source is shown on the report):
+ *   1. seats checked out to an asset / user at that cinema,
+ *   2. "Licensed To" (license_name) containing the cinema name,
+ *   3. the license name containing the cinema name or its code
+ *      ("AAM ND" -> ND = Nguyễn Du, same code as on BBSC numbers).
+ *
+ * End date = the earlier of expiration_date and termination_date.
+ * Product keys are never read or shown.
+ */
+class LicenseReportService
+{
+    /** Licenses ending within this many days are listed. */
+    public const SOON_DAYS = 60;
+
+    /** The card on top counts licenses ending within this many days. */
+    public const CARD_DAYS = 30;
+
+    public const SOURCE_SEAT = 'seat';
+
+    public const SOURCE_LICENSED_TO = 'licensed_to';
+
+    public const SOURCE_NAME = 'name';
+
+    public const SOURCE_LABELS = [
+        self::SOURCE_SEAT => 'theo seat đã gán',
+        self::SOURCE_LICENSED_TO => 'theo ô Licensed To',
+        self::SOURCE_NAME => 'theo tên license',
+    ];
+
+    public function __construct(private InventoryRepository $inventory) {}
+
+    /**
+     * @return array<string, mixed> rows + counters + purchase plan
+     */
+    public function report(?Carbon $today = null): array
+    {
+        $today = ($today ?? Carbon::now())->copy()->startOfDay();
+        $limit = $today->copy()->addDays(self::SOON_DAYS)->endOfDay();
+
+        $licenses = License::query()
+            ->select(['id', 'name', 'license_name', 'seats', 'expiration_date', 'termination_date', 'manufacturer_id', 'category_id', 'company_id'])
+            ->where(function ($q) use ($limit) {
+                $q->where(fn ($e) => $e->whereNotNull('expiration_date')->where('expiration_date', '<=', $limit))
+                    ->orWhere(fn ($t) => $t->whereNotNull('termination_date')->where('termination_date', '<=', $limit));
+            })
+            ->with([
+                'manufacturer:id,name',
+                'category:id,name',
+                'licenseseats' => fn ($q) => $q->select(['id', 'license_id', 'assigned_to', 'asset_id']),
+                'licenseseats.user:id,first_name,last_name,username,location_id',
+                'licenseseats.user.location.parent',
+                'licenseseats.asset' => fn ($q) => $q->select(['id', 'name', 'asset_tag', 'location_id', 'rtd_location_id', 'assigned_to', 'assigned_type', 'company_id']),
+                'licenseseats.asset.location.parent',
+                'licenseseats.asset.defaultLoc',
+                'licenseseats.asset.assignedTo' => fn ($morph) => $morph->morphWith([Location::class => ['parent']]),
+            ])
+            ->limit(500)
+            ->get();
+
+        $rows = [];
+        foreach ($licenses as $license) {
+            $where = [];
+            $seatSites = [];
+            $used = 0;
+            foreach ($license->licenseseats as $seat) {
+                if ($seat->asset instanceof Asset) {
+                    $used++;
+                    [$site, $hall] = MaintenanceFormExporter::siteAndHall($seat->asset);
+                    if ($site !== '') {
+                        $seatSites[] = $site;
+                    }
+                    $where[] = trim(implode(' ', array_filter([
+                        $site,
+                        $hall !== '' ? 'Hall '.$hall : '',
+                        '– '.($seat->asset->name ?: $seat->asset->asset_tag),
+                    ])));
+                } elseif ($seat->assigned_to && $seat->user) {
+                    $used++;
+                    $site = IncidentReportRepository::siteOfUser($seat->user);
+                    if ($site !== '') {
+                        $seatSites[] = $site;
+                    }
+                    $where[] = 'Người dùng: '.trim($seat->user->first_name.' '.$seat->user->last_name).($site !== '' ? ' ('.$site.')' : '');
+                }
+            }
+
+            $rows[] = self::decorate([
+                'id' => $license->id,
+                'name' => (string) $license->name,
+                'licensed_to' => (string) ($license->license_name ?? ''),
+                'manufacturer' => (string) ($license->manufacturer?->name ?? ''),
+                'category' => (string) ($license->category?->name ?? ''),
+                'seats' => (int) $license->seats,
+                'used' => $used,
+                'where' => array_values(array_unique($where)),
+                'seat_sites' => array_values(array_unique($seatSites)),
+                'expiration_date' => $license->expiration_date ? Carbon::parse($license->expiration_date) : null,
+                'termination_date' => $license->termination_date ? Carbon::parse($license->termination_date) : null,
+            ], $today);
+        }
+
+        // Rooms per cinema, from the equipment overview (cached 10 min).
+        $siteRooms = [];
+        foreach ($this->inventory->cachedOverview()['sites'] ?? [] as $s) {
+            $siteRooms[$s['site']] = (int) $s['rooms'];
+        }
+
+        return self::summarize(self::planPurchases($rows, $siteRooms));
+    }
+
+    /**
+     * Adds end_date / end_kind / days_left / state.
+     *
+     * @param  array<string, mixed>  $r
+     * @return array<string, mixed>
+     */
+    public static function decorate(array $r, Carbon $today): array
+    {
+        $exp = $r['expiration_date'] ?? null;
+        $term = $r['termination_date'] ?? null;
+
+        $end = $exp;
+        $kind = 'Hết hạn';
+        if ($term && (! $exp || $term->lt($exp))) {
+            $end = $term;
+            $kind = 'Chấm dứt';
+        }
+
+        $days = $end ? (int) floor(($end->copy()->startOfDay()->getTimestamp() - $today->copy()->startOfDay()->getTimestamp()) / 86400) : null;
+
+        $r['end_date'] = $end;
+        $r['end_label'] = $end ? $end->format('d/m/Y') : '';
+        $r['end_kind'] = $kind;
+        $r['days_left'] = $days;
+        $r['state'] = $days === null ? 'none' : ($days < 0 ? 'expired' : ($days <= self::CARD_DAYS ? 'soon' : 'later'));
+
+        return $r;
+    }
+
+    /**
+     * Work out cinema(s), product and quantity (= rooms) for each license.
+     *
+     * Adds to each row:
+     *   'buy'     => list of ['site' => ..., 'rooms' => int|null]
+     *   'source'  => seat | licensed_to | name | ''   (how the cinema was found)
+     *   'product' => license name without the cinema code / name ("AAM ND" -> "AAM")
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @param  array<string, int>  $siteRooms  cinema name => rooms
+     * @return list<array<string, mixed>>
+     */
+    public static function planPurchases(array $rows, array $siteRooms): array
+    {
+        $sites = array_keys($siteRooms);
+
+        foreach ($rows as &$r) {
+            $found = [];
+            $source = '';
+
+            // 1. Seats checked out at a cinema.
+            foreach ($r['seat_sites'] ?? [] as $s) {
+                $match = self::matchSiteName($s, $sites) ?? $s;
+                $found[$match] = true;
+            }
+            if ($found) {
+                $source = self::SOURCE_SEAT;
+            }
+
+            // 2. "Licensed To" text.
+            if (! $found && ($r['licensed_to'] ?? '') !== '') {
+                foreach (self::sitesInText($r['licensed_to'], $sites) as $s) {
+                    $found[$s] = true;
+                }
+                if ($found) {
+                    $source = self::SOURCE_LICENSED_TO;
+                }
+            }
+
+            // 3. License name (cinema name or code such as "ND").
+            if (! $found) {
+                foreach (self::sitesInText($r['name'], $sites) as $s) {
+                    $found[$s] = true;
+                }
+                if ($found) {
+                    $source = self::SOURCE_NAME;
+                }
+            }
+
+            $r['source'] = $source;
+            $r['buy'] = [];
+            foreach (array_keys($found) as $s) {
+                $r['buy'][] = ['site' => $s, 'rooms' => $siteRooms[$s] ?? null];
+            }
+            $r['product'] = self::productName($r['name'], array_keys($found));
+        }
+        unset($r);
+
+        return $rows;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return array<string, mixed>
+     */
+    public static function summarize(array $rows): array
+    {
+        $rows = array_values(array_filter($rows, fn ($r) => $r['days_left'] !== null && $r['days_left'] <= self::SOON_DAYS));
+        usort($rows, fn ($a, $b) => $a['days_left'] <=> $b['days_left'] ?: strnatcasecmp($a['name'], $b['name']));
+
+        // Purchase lines + totals per product.
+        $lines = [];
+        $products = [];
+        foreach ($rows as $r) {
+            foreach ($r['buy'] ?? [] as $b) {
+                $lines[] = [
+                    'license_id' => $r['id'],
+                    'license' => $r['name'],
+                    'product' => $r['product'],
+                    'site' => $b['site'],
+                    'rooms' => $b['rooms'],
+                    'end_label' => $r['end_label'],
+                    'days_left' => $r['days_left'],
+                    'source' => $r['source'],
+                ];
+                $p = $r['product'] !== '' ? $r['product'] : $r['name'];
+                $products[$p] ??= ['product' => $p, 'licenses' => 0, 'rooms' => 0, 'unknown_rooms' => 0, 'sites' => []];
+                $products[$p]['licenses']++;
+                $products[$p]['sites'][] = $b['site'];
+                if ($b['rooms'] === null) {
+                    $products[$p]['unknown_rooms']++;
+                } else {
+                    $products[$p]['rooms'] += $b['rooms'];
+                }
+            }
+        }
+        ksort($products, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return [
+            'rows' => $rows,
+            'lines' => $lines,
+            'products' => array_values($products),
+            'unresolved' => array_values(array_filter($rows, fn ($r) => empty($r['buy']))),
+            'expired' => count(array_filter($rows, fn ($r) => $r['state'] === 'expired')),
+            'soon_card' => count(array_filter($rows, fn ($r) => $r['state'] === 'soon')),
+            'soon_list' => count(array_filter($rows, fn ($r) => $r['days_left'] >= 0)),
+            'total' => count($rows),
+        ];
+    }
+
+    /**
+     * Excel: "Cần mua" (one line per license × cinema) + "Theo sản phẩm".
+     *
+     * @param  array<string, mixed>  $report
+     */
+    public static function exportPurchase(array $report, string $path): string
+    {
+        $rows = [];
+        $styles = [];
+        foreach ($report['lines'] as $i => $l) {
+            $rows[] = [
+                $i + 1,
+                $l['product'] !== '' ? $l['product'] : $l['license'],
+                $l['site'],
+                $l['rooms'] ?? null,
+                $l['rooms'] === null ? 'Chưa rõ số phòng' : '1 license cho rạp '.$l['site'].', số lượng '.$l['rooms'].' phòng',
+                $l['license'],
+                $l['end_label'],
+                $l['days_left'] < 0 ? 'Quá hạn '.abs($l['days_left']).' ngày' : 'Còn '.$l['days_left'].' ngày',
+                self::SOURCE_LABELS[$l['source']] ?? '',
+            ];
+            if ($l['days_left'] < 0) {
+                $styles[$i] = 'red';
+            }
+        }
+        foreach ($report['unresolved'] as $u) {
+            $rows[] = [count($rows) + 1, $u['product'] ?: $u['name'], '(chưa xác định rạp)', null, 'Cần gán seat hoặc ghi tên rạp vào Licensed To', $u['name'], $u['end_label'],
+                $u['days_left'] < 0 ? 'Quá hạn '.abs($u['days_left']).' ngày' : 'Còn '.$u['days_left'].' ngày', ''];
+            $styles[count($rows) - 1] = 'red';
+        }
+
+        $w = new SimpleXlsxWriter;
+        $totalRooms = array_sum(array_map(fn ($l) => (int) ($l['rooms'] ?? 0), $report['lines']));
+        $w->addSheet('Cần mua', ['STT', 'Sản phẩm', 'Rạp', 'Số phòng (SL cần mua)', 'Ghi chú mua', 'License hiện tại', 'Ngày kết thúc', 'Tình trạng', 'Xác định rạp'], $rows, [
+            'title' => 'DANH SÁCH LICENSE CẦN MUA TIẾP',
+            'subtitle' => 'License đã hết hạn hoặc hết hạn trong '.self::SOON_DAYS.' ngày  |  Xuất lúc '.date('d/m/Y H:i'),
+            'widths' => [5, 18, 22, 12, 42, 24, 13, 16, 18],
+            'rowStyles' => $styles,
+            'totalRow' => $rows ? ['Tổng', null, count($report['lines']).' license', $totalRooms, null, null, null, null, null] : null,
+        ]);
+
+        $p = [];
+        foreach ($report['products'] as $pr) {
+            $p[] = [$pr['product'], $pr['licenses'], $pr['rooms'], implode(', ', $pr['sites']), $pr['unknown_rooms'] ? $pr['unknown_rooms'].' rạp chưa rõ số phòng' : ''];
+        }
+        $w->addSheet('Theo sản phẩm', ['Sản phẩm', 'Số license (rạp)', 'Tổng số phòng', 'Các rạp', 'Ghi chú'], $p, [
+            'title' => 'TỔNG HỢP THEO SẢN PHẨM',
+            'widths' => [20, 14, 14, 60, 24],
+        ]);
+
+        return $w->save($path);
+    }
+
+    // ------------------------------------------------------------------
+
+    /** Exact (accent/case-insensitive) match of a site name against known cinemas. */
+    private static function matchSiteName(string $name, array $sites): ?string
+    {
+        $f = self::fold($name);
+        foreach ($sites as $s) {
+            if (self::fold($s) === $f) {
+                return $s;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Cinemas mentioned in a text: full name contained ("AAM Nguyễn Du")
+     * or the cinema code as a separate word ("AAM ND", "AAM-ND").
+     * A code shared by two cinemas is ignored (ambiguous).
+     *
+     * @param  list<string>  $sites
+     * @return list<string>
+     */
+    public static function sitesInText(string $text, array $sites): array
+    {
+        $hay = ' '.preg_replace('/[^a-z0-9]+/', ' ', self::fold($text)).' ';
+        $found = [];
+
+        // Longer names first so "Go Bến Tre" wins over "Bến Tre".
+        $byLen = $sites;
+        usort($byLen, fn ($a, $b) => mb_strlen($b) <=> mb_strlen($a));
+        foreach ($byLen as $s) {
+            $needle = ' '.preg_replace('/[^a-z0-9]+/', ' ', self::fold($s)).' ';
+            if (trim($needle) !== '' && str_contains($hay, $needle)) {
+                $found[$s] = true;
+                $hay = str_replace($needle, ' ', $hay);
+            }
+        }
+        if ($found) {
+            return array_keys($found);
+        }
+
+        $codes = [];
+        foreach ($sites as $s) {
+            $codes[strtolower(MaintenanceFormExporter::siteCode($s))][] = $s;
+        }
+        foreach (array_filter(explode(' ', $hay)) as $word) {
+            if (strlen($word) >= 2 && isset($codes[$word]) && count($codes[$word]) === 1) {
+                $found[$codes[$word][0]] = true;
+            }
+        }
+
+        return array_keys($found);
+    }
+
+    /** "AAM ND" -> "AAM", "TMS - Nguyễn Du" -> "TMS". */
+    public static function productName(string $name, array $sites): string
+    {
+        $out = ' '.$name.' ';
+        foreach ($sites as $s) {
+            $out = preg_replace('/(?<![\p{L}\p{N}])'.preg_quote($s, '/').'(?![\p{L}\p{N}])/iu', ' ', $out);
+            $code = MaintenanceFormExporter::siteCode($s);
+            $out = preg_replace('/(?<![\p{L}\p{N}])'.preg_quote($code, '/').'(?![\p{L}\p{N}])/iu', ' ', $out);
+        }
+        $out = trim(preg_replace('/\s*[-–_|,]+\s*$|^\s*[-–_|,]+\s*/u', '', trim(preg_replace('/\s+/u', ' ', $out))));
+
+        return $out !== '' ? $out : $name;
+    }
+
+    private static function fold(string $v): string
+    {
+        return Str::lower(Str::ascii(trim($v)));
+    }
+}

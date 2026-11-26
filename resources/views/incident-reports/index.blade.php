@@ -18,6 +18,7 @@
     .ir-stats .info-box-number { font-size: 22px; }
     .ir-filters .form-group { margin-right: 8px; margin-bottom: 8px; }
     .ir-stats a.ir-card { display: block; color: inherit; text-decoration: none; }
+    @media (min-width: 1200px) { .ir-stats .ir-col5 { width: 20%; } }
     .ir-stats a.ir-card .info-box { transition: box-shadow .15s, transform .15s; }
     .ir-stats a.ir-card:hover .info-box { box-shadow: 0 3px 10px rgba(0,0,0,.18); transform: translateY(-1px); }
     .ir-stats a.ir-card.active .info-box { box-shadow: 0 0 0 3px #3c8dbc; }
@@ -83,7 +84,7 @@
         @endphp
         <div class="row ir-stats">
             @foreach ($cards as $card)
-                <div class="col-lg-3 col-sm-6 col-xs-6">
+                <div class="{{ $licenses !== null ? 'ir-col5 col-lg-3' : 'col-lg-3' }} col-sm-6 col-xs-6">
                     <a href="{{ route('incident-reports.index', $cardBase + ($card['status'] !== '' ? ['status' => $card['status']] : [])) }}#ir-list"
                        class="ir-card{{ $filters['status'] === $card['status'] ? ' active' : '' }}"
                        title="Xem danh sách: {{ $card['label'] }}">
@@ -100,6 +101,20 @@
                     </a>
                 </div>
             @endforeach
+            @if ($licenses !== null)
+                <div class="ir-col5 col-lg-3 col-sm-6 col-xs-6">
+                    <a href="#ir-licenses" class="ir-card" title="Xem báo cáo License">
+                        <div class="info-box">
+                            <span class="info-box-icon {{ $licenses['expired'] ? 'bg-red' : ($licenses['soon_card'] ? 'bg-orange' : 'bg-green') }}"><i class="far fa-save" aria-hidden="true"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">License sắp hết hạn</span>
+                                <span class="info-box-number">{{ $licenses['soon_card'] }}</span>
+                                <span class="progress-description" style="font-size:12px">trong {{ \App\Services\MaintenanceForms\LicenseReportService::CARD_DAYS }} ngày · {{ $licenses['expired'] }} đã hết hạn</span>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            @endif
         </div>
 
         {{-- ====== Bộ lọc ====== --}}
@@ -422,6 +437,106 @@
                 </form>
             </div>
         </div>
+
+        {{-- ====== Báo cáo License ====== --}}
+        @if ($licenses !== null)
+            <div class="box box-default" id="ir-licenses">
+                <div class="box-header with-border">
+                    <h2 class="box-title"><i class="far fa-save" aria-hidden="true"></i>
+                        Báo cáo License – đã hết hạn &amp; sắp hết hạn trong {{ \App\Services\MaintenanceForms\LicenseReportService::SOON_DAYS }} ngày
+                    </h2>
+                    <div class="box-tools pull-right">
+                        <a href="{{ route('incident-reports.licenses.export') }}" class="btn btn-success btn-xs"><i class="fas fa-file-excel" aria-hidden="true"></i> Xuất danh sách cần mua (Excel)</a>
+                        <a href="{{ url('licenses') }}" class="btn btn-default btn-xs">Mở trang Licenses</a>
+                    </div>
+                </div>
+                <div class="box-body">
+                    @if (count($licenses['rows']))
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover table-condensed">
+                                <thead>
+                                    <tr>
+                                        <th>License</th>
+                                        <th>Nhà SX / Loại</th>
+                                        <th>Ngày kết thúc</th>
+                                        <th>Còn lại</th>
+                                        <th>Cần mua tiếp</th>
+                                        <th class="text-center">Seat dùng / tổng</th>
+                                        <th>Đang gắn cho</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($licenses['rows'] as $lic)
+                                        <tr>
+                                            <td><a href="{{ url('licenses/'.$lic['id']) }}"><strong>{{ $lic['name'] }}</strong></a></td>
+                                            <td>{{ $lic['manufacturer'] }}@if ($lic['category'])<br><small class="text-muted">{{ $lic['category'] }}</small>@endif</td>
+                                            <td style="white-space:nowrap">{{ $lic['end_label'] }}<br><small class="text-muted">{{ $lic['end_kind'] }}</small></td>
+                                            <td style="white-space:nowrap">
+                                                @if ($lic['state'] === 'expired')
+                                                    <span class="label label-danger">Quá hạn {{ abs($lic['days_left']) }} ngày</span>
+                                                @elseif ($lic['days_left'] === 0)
+                                                    <span class="label label-danger">Hết hạn hôm nay</span>
+                                                @elseif ($lic['state'] === 'soon')
+                                                    <span class="label label-warning">Còn {{ $lic['days_left'] }} ngày</span>
+                                                @else
+                                                    <span class="label label-default">Còn {{ $lic['days_left'] }} ngày</span>
+                                                @endif
+                                            </td>
+                                            <td style="font-size:12px">
+                                                @forelse ($lic['buy'] ?? [] as $b)
+                                                    <strong>1 license {{ $lic['product'] }}</strong> cho rạp <strong>{{ $b['site'] }}</strong>,
+                                                    @if ($b['rooms'] !== null)
+                                                        số lượng <strong>{{ $b['rooms'] }} phòng</strong>
+                                                    @else
+                                                        <span class="text-danger">chưa rõ số phòng</span>
+                                                    @endif
+                                                    <br>
+                                                @empty
+                                                    <span class="text-danger">Chưa xác định rạp</span><br>
+                                                    <small class="text-muted">Gán seat cho thiết bị ở rạp, hoặc ghi tên rạp vào ô Licensed To / tên license</small>
+                                                @endforelse
+                                                @if (! empty($lic['source']))
+                                                    <small class="text-muted">({{ \App\Services\MaintenanceForms\LicenseReportService::SOURCE_LABELS[$lic['source']] }})</small>
+                                                @endif
+                                            </td>
+                                            <td class="text-center">{{ $lic['used'] }} / {{ $lic['seats'] }}</td>
+                                            <td style="font-size:12px">
+                                                @forelse (array_slice($lic['where'], 0, 6) as $w)
+                                                    {{ $w }}<br>
+                                                @empty
+                                                    <span class="text-muted">Chưa gắn cho thiết bị / người nào</span>
+                                                @endforelse
+                                                @if (count($lic['where']) > 6)
+                                                    <span class="text-muted">… và {{ count($lic['where']) - 6 }} nơi khác</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        @if (count($licenses['products']))
+                            <p style="margin:8px 0 0">
+                                <strong>Tổng cần mua:</strong>
+                                @foreach ($licenses['products'] as $pr)
+                                    <span class="label label-primary" style="font-size:12px; margin-right:6px">{{ $pr['product'] }}: {{ $pr['licenses'] }} license / {{ $pr['rooms'] }} phòng</span>
+                                @endforeach
+                            </p>
+                        @endif
+                        <p class="text-muted" style="font-size:12px; margin:6px 0 0">
+                            Mỗi license mua theo rạp, số lượng = số phòng của rạp (lấy từ trang Tra cứu thiết bị).
+                            Rạp của license xác định theo: seat đã gán → ô Licensed To → tên license (tên rạp hoặc mã rạp, vd "AAM ND" = Nguyễn Du).
+                            Ngày kết thúc = ngày sớm hơn giữa Expiration Date và Termination Date. Không hiển thị product key.
+                        </p>
+                    @else
+                        <p class="text-muted" style="margin:0">
+                            Không có license nào đã hết hạn hoặc sắp hết hạn trong {{ \App\Services\MaintenanceForms\LicenseReportService::SOON_DAYS }} ngày tới
+                            (chỉ tính license có nhập Expiration Date / Termination Date).
+                        </p>
+                    @endif
+                </div>
+            </div>
+        @endif
 
     </div>
 </div>
