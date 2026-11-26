@@ -243,7 +243,7 @@
                         </div>
                         <p class="text-muted" style="font-size:12px; margin:6px 0 0">
                             Số phòng = số Hall khác nhau có Projector / Server / Processor (gồm cả phòng đoán từ tên thiết bị).
-                            Không tính các location: VP HO, MEP.
+                            Không tính các location: VP HO, MEP, Projection.
                             Loại thiết bị nhận theo Category, rồi theo tên model / tên thiết bị.
                         </p>
                     </div>

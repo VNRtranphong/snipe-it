@@ -83,7 +83,7 @@ class InventoryRepository
      * Locations that are not cinemas (office, MEP …) – left out of the
      * overview. Compared case/accent-insensitively; add names here.
      */
-    public const OVERVIEW_EXCLUDED_SITES = ['vp ho', 'mep'];
+    public const OVERVIEW_EXCLUDED_SITES = ['vp ho', 'mep', 'projection'];
 
     public static function isExcludedSite(string $site): bool
     {
