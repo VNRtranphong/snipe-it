@@ -112,7 +112,7 @@ class InventoryRepository
     public function cachedOverview(bool $refresh = false): array
     {
         $user = auth()->user();
-        $key = 'equipment-lookup-overview:v2:'.($user?->isSuperUser() ? 'su' : 'c'.($user?->company_id ?? 0));
+        $key = 'equipment-lookup-overview:v3:'.($user?->isSuperUser() ? 'su' : 'c'.($user?->company_id ?? 0));
 
         if ($refresh) {
             Cache::forget($key);
@@ -127,31 +127,38 @@ class InventoryRepository
      * Tổng quan: sites, rooms per site and which Projector / Server /
      * Processor models each site uses.
      *
-     * Only assets of models that are Projector / Server / Processor are
-     * loaded (decided once per model from its category / model name),
-     * instead of every asset in the system.
+     * Classification is by the MODEL'S CATEGORY only (Snipe-IT data), never
+     * by guessing from model or asset names: a model counts as "Server"
+     * only if its category is a Server category. Only those models' assets
+     * are loaded.
      *
      * @return array<string, mixed>
      */
     public function overview(): array
     {
-        // 1. Which models are Projector / Server / Processor? (a few hundred rows at most)
+        // 1. Which categories are Projector / Server / Processor (by category name only).
+        $categoryKinds = [];
+        $categoryMap = array_fill_keys(self::OVERVIEW_KINDS, []);
+        foreach (Category::where('category_type', 'asset')->get(['id', 'name']) as $cat) {
+            $kind = self::kindOfCategory((string) $cat->name);
+            if ($kind !== null) {
+                $categoryKinds[$cat->id] = $kind;
+                $categoryMap[$kind][] = (string) $cat->name;
+            }
+        }
+
+        // 2. Models in those categories.
         $modelKinds = [];
-        foreach (AssetModel::with('category:id,name')->get(['id', 'name', 'category_id']) as $model) {
-            $kind = MaintenanceFormExporter::equipmentLabel([
-                'category' => (string) ($model->category?->name ?? ''),
-                'model' => (string) $model->name,
-                'asset_name' => '',
-            ]);
-            if (in_array($kind, self::OVERVIEW_KINDS, true)) {
-                $modelKinds[$model->id] = [$kind, (string) $model->name, $model->category_id];
+        if ($categoryKinds) {
+            foreach (AssetModel::whereIn('category_id', array_keys($categoryKinds))->get(['id', 'name', 'category_id']) as $model) {
+                $modelKinds[$model->id] = [$categoryKinds[$model->category_id], (string) $model->name, $model->category_id];
             }
         }
         if (! $modelKinds) {
-            return self::summarizeOverview([]);
+            return self::summarizeOverview([]) + ['category_map' => $categoryMap];
         }
 
-        // 2. Only their assets, with everything siteAndHall() needs eager-loaded (no N+1).
+        // 3. Only their assets, with everything siteAndHall() needs eager-loaded (no N+1).
         $rows = [];
         Asset::query()
             ->whereIn('model_id', array_keys($modelKinds))
@@ -178,7 +185,27 @@ class InventoryRepository
                 }
             });
 
-        return self::summarizeOverview($rows);
+        return self::summarizeOverview($rows) + ['category_map' => $categoryMap];
+    }
+
+    /**
+     * Overview column for a Snipe-IT category, judged from the CATEGORY name
+     * only (e.g. "Projector", "Máy chiếu", "Server", "Processor"). null = not shown.
+     */
+    public static function kindOfCategory(string $categoryName): ?string
+    {
+        $n = \Illuminate\Support\Str::lower(\Illuminate\Support\Str::ascii($categoryName));
+        if (preg_match('/projector|may chieu/', $n)) {
+            return 'Projector';
+        }
+        if (preg_match('/server/', $n)) {
+            return 'Server';
+        }
+        if (preg_match('/processor|bo xu ly am thanh/', $n)) {
+            return 'Processor';
+        }
+
+        return null;
     }
 
     /**
