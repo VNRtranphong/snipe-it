@@ -214,7 +214,8 @@ class LicenseReportService
             foreach (array_keys($found) as $s) {
                 $r['buy'][] = ['site' => $s, 'rooms' => $siteRooms[$s] ?? null];
             }
-            $r['product'] = self::productName($r['name'], array_keys($found));
+            $r['current_product'] = self::productName($r['name'], array_keys($found));
+            $r['product'] = self::purchaseProduct($r['current_product']);
         }
         unset($r);
 
@@ -286,31 +287,26 @@ class LicenseReportService
                 $l['product'] !== '' ? $l['product'] : $l['license'],
                 $l['site'],
                 $l['rooms'] ?? null,
-                $l['rooms'] === null ? 'Chưa rõ số phòng' : '1 license cho rạp '.$l['site'].', số lượng '.$l['rooms'].' phòng',
-                $l['license'],
                 $l['mac'] ?? '',
                 $l['end_label'],
-                $l['days_left'] < 0 ? 'Quá hạn '.abs($l['days_left']).' ngày' : 'Còn '.$l['days_left'].' ngày',
-                self::SOURCE_LABELS[$l['source']] ?? '',
             ];
             if ($l['days_left'] < 0) {
                 $styles[$i] = 'red';
             }
         }
         foreach ($report['unresolved'] as $u) {
-            $rows[] = [count($rows) + 1, $u['product'] ?: $u['name'], '(chưa xác định rạp)', null, 'Cần gán seat hoặc ghi tên rạp vào Licensed To', $u['name'], $u['mac'] ?? '', $u['end_label'],
-                $u['days_left'] < 0 ? 'Quá hạn '.abs($u['days_left']).' ngày' : 'Còn '.$u['days_left'].' ngày', ''];
+            $rows[] = [count($rows) + 1, $u['product'] ?: $u['name'], '(chưa xác định rạp: '.$u['name'].')', null, $u['mac'] ?? '', $u['end_label']];
             $styles[count($rows) - 1] = 'red';
         }
 
         $w = new SimpleXlsxWriter;
         $totalRooms = array_sum(array_map(fn ($l) => (int) ($l['rooms'] ?? 0), $report['lines']));
-        $w->addSheet('Cần mua', ['STT', 'Sản phẩm', 'Rạp', 'Số phòng (SL cần mua)', 'Ghi chú mua', 'License hiện tại', 'MAC', 'Ngày kết thúc', 'Tình trạng', 'Xác định rạp'], $rows, [
+        $w->addSheet('Cần mua', ['STT', 'Sản phẩm', 'Rạp', 'Số phòng (SL cần mua)', 'MAC', 'Ngày kết thúc'], $rows, [
             'title' => 'DANH SÁCH LICENSE CẦN MUA TIẾP',
             'subtitle' => 'License đã hết hạn hoặc hết hạn trong '.self::SOON_DAYS.' ngày  |  Xuất lúc '.date('d/m/Y H:i'),
-            'widths' => [5, 14, 22, 12, 42, 24, 19, 13, 16, 18],
+            'widths' => [6, 24, 26, 14, 20, 14],
             'rowStyles' => $styles,
-            'totalRow' => $rows ? ['Tổng', null, count($report['lines']).' license', $totalRooms, null, null, null, null, null, null] : null,
+            'totalRow' => $rows ? ['Tổng', null, count($report['lines']).' license', $totalRooms, null, null] : null,
         ]);
 
         $p = [];
@@ -319,7 +315,7 @@ class LicenseReportService
         }
         $w->addSheet('Theo sản phẩm', ['Sản phẩm', 'Số license (rạp)', 'Tổng số phòng', 'Các rạp', 'Ghi chú'], $p, [
             'title' => 'TỔNG HỢP THEO SẢN PHẨM',
-            'widths' => [20, 14, 14, 60, 24],
+            'widths' => [24, 14, 14, 60, 24],
         ]);
 
         return $w->save($path);
@@ -435,6 +431,22 @@ class LicenseReportService
      *   "AAM Nguyễn Du" -> "AAM", "AAM Hà Nội Centre" -> "AAM",
      *   "AAM ND" -> "AAM", "AAM BT Sense" (cinema found by seat) -> "AAM".
      */
+    /**
+     * What to buy when a license runs out. AAM renews as AAM Screenwriter Plus;
+     * GDC TMS is being replaced by AAM from next year. Others keep their own name.
+     */
+    public const PURCHASE_PRODUCTS = [
+        'aam' => 'AAM Screenwriter Plus',
+        'gdc' => 'AAM Screenwriter Plus',
+    ];
+
+    public static function purchaseProduct(string $current): string
+    {
+        $first = self::words($current)[0] ?? '';
+
+        return self::PURCHASE_PRODUCTS[$first] ?? $current;
+    }
+
     public static function productName(string $name, array $sites): string
     {
         $drop = self::GENERIC_WORDS;
