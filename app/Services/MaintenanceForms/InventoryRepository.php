@@ -5,6 +5,8 @@ namespace App\Services\MaintenanceForms;
 use App\Models\Asset;
 use App\Models\AssetModel;
 use App\Models\Category;
+use App\Models\Location;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -98,32 +100,80 @@ class InventoryRepository
      *
      * @return array<string, mixed>
      */
+    /** Minutes the overview is cached (it only changes when assets move). */
+    public const OVERVIEW_CACHE_MINUTES = 10;
+
+    /**
+     * Cached overview. Cache key includes the user's company so Full
+     * Multiple Companies Support never leaks counts across companies.
+     *
+     * @return array<string, mixed> overview + 'generated_at' (Carbon)
+     */
+    public function cachedOverview(bool $refresh = false): array
+    {
+        $user = auth()->user();
+        $key = 'equipment-lookup-overview:v2:'.($user?->isSuperUser() ? 'su' : 'c'.($user?->company_id ?? 0));
+
+        if ($refresh) {
+            Cache::forget($key);
+        }
+
+        return Cache::remember($key, now()->addMinutes(self::OVERVIEW_CACHE_MINUTES), function () {
+            return $this->overview() + ['generated_at' => now()];
+        });
+    }
+
+    /**
+     * Tổng quan: sites, rooms per site and which Projector / Server /
+     * Processor models each site uses.
+     *
+     * Only assets of models that are Projector / Server / Processor are
+     * loaded (decided once per model from its category / model name),
+     * instead of every asset in the system.
+     *
+     * @return array<string, mixed>
+     */
     public function overview(): array
     {
+        // 1. Which models are Projector / Server / Processor? (a few hundred rows at most)
+        $modelKinds = [];
+        foreach (AssetModel::with('category:id,name')->get(['id', 'name', 'category_id']) as $model) {
+            $kind = MaintenanceFormExporter::equipmentLabel([
+                'category' => (string) ($model->category?->name ?? ''),
+                'model' => (string) $model->name,
+                'asset_name' => '',
+            ]);
+            if (in_array($kind, self::OVERVIEW_KINDS, true)) {
+                $modelKinds[$model->id] = [$kind, (string) $model->name, $model->category_id];
+            }
+        }
+        if (! $modelKinds) {
+            return self::summarizeOverview([]);
+        }
+
+        // 2. Only their assets, with everything siteAndHall() needs eager-loaded (no N+1).
         $rows = [];
         Asset::query()
-            ->with(['model.category', 'location.parent', 'defaultLoc', 'assignedTo'])
-            ->select(['id', 'name', 'asset_tag', 'model_id', 'location_id', 'rtd_location_id', 'assigned_to', 'assigned_type', 'company_id'])
+            ->whereIn('model_id', array_keys($modelKinds))
+            ->with([
+                'location.parent',
+                'defaultLoc',
+                'company:id,name',
+                'assignedTo' => fn ($morph) => $morph->morphWith([Location::class => ['parent']]),
+            ])
+            ->select(['id', 'name', 'model_id', 'location_id', 'rtd_location_id', 'assigned_to', 'assigned_type', 'company_id'])
             ->orderBy('id')
-            ->chunk(1000, function ($assets) use (&$rows) {
+            ->chunk(1000, function ($assets) use (&$rows, $modelKinds) {
                 foreach ($assets as $asset) {
-                    $d = [
-                        'category' => (string) ($asset->model?->category?->name ?? ''),
-                        'model' => (string) ($asset->model?->name ?? ''),
-                        'asset_name' => (string) $asset->name,
-                    ];
-                    $kind = MaintenanceFormExporter::equipmentLabel($d);
-                    if (! in_array($kind, self::OVERVIEW_KINDS, true)) {
-                        continue;
-                    }
+                    [$kind, $modelName, $categoryId] = $modelKinds[$asset->model_id];
                     [$site, $hall] = MaintenanceFormExporter::siteAndHall($asset);
                     $rows[] = [
                         'site' => $site,
                         'hall' => $hall,
                         'kind' => $kind,
-                        'model' => $d['model'] !== '' ? $d['model'] : '(Không rõ model)',
+                        'model' => $modelName !== '' ? $modelName : '(Không rõ model)',
                         'model_id' => $asset->model_id,
-                        'category_id' => $asset->model?->category_id,
+                        'category_id' => $categoryId,
                     ];
                 }
             });

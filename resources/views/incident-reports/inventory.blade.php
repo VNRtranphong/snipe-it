@@ -244,6 +244,10 @@
                         <p class="text-muted" style="font-size:12px; margin:6px 0 0">
                             Số phòng = số Hall khác nhau có Projector / Server / Processor (gồm cả phòng đoán từ tên thiết bị).
                             Không tính các location: VP HO, MEP, Projection.
+                            @if (! empty($overview['generated_at']))
+                                <br>Số liệu lúc {{ \Carbon\Carbon::parse($overview['generated_at'])->format('H:i d/m/Y') }} (tự cập nhật mỗi {{ \App\Services\MaintenanceForms\InventoryRepository::OVERVIEW_CACHE_MINUTES }} phút).
+                                <a href="{{ route('equipment-lookup.index', ['refresh' => 1]) }}" class="btn btn-default btn-xs" style="margin-left:4px"><i class="fas fa-sync-alt" aria-hidden="true"></i> Làm mới</a>
+                            @endif
                             Loại thiết bị nhận theo Category, rồi theo tên model / tên thiết bị.
                         </p>
                     </div>
