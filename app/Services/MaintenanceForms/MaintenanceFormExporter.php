@@ -75,9 +75,9 @@ class MaintenanceFormExporter
      * @param  string|null  $number  official number from IncidentDocumentService (e.g. "HTP-03.12/01/2026-BBSC")
      * @return array{0: string, 1: string} [temp file path, download filename]
      */
-    public function incidentReport(Maintenance $maintenance, ?string $number = null): array
+    public function incidentReport(Maintenance $maintenance, ?string $number = null, ?array $place = null): array
     {
-        $data = self::collect($maintenance);
+        $data = self::withPlace(self::collect($maintenance), $place);
         $data['doc_number'] = $number;
         $path = $this->tempPath();
         $this->fillIncident($data, $path);
@@ -86,13 +86,33 @@ class MaintenanceFormExporter
     }
 
     /** @return array{0: string, 1: string} [temp file path, download filename] */
-    public function serviceReport(Maintenance $maintenance): array
+    public function serviceReport(Maintenance $maintenance, ?array $place = null): array
     {
-        $data = self::collect($maintenance);
+        $data = self::withPlace(self::collect($maintenance), $place);
         $path = $this->tempPath();
         $this->fillService($data, $path);
 
         return [$path, $this->fileName('ServiceReport', $data)];
+    }
+
+    /**
+     * Use the cinema / hall remembered for this incident (see
+     * IncidentDocumentService) instead of where the asset is now.
+     *
+     * @param  array<string, mixed>  $d
+     * @param  array{site?: string|null, hall?: string|null}|null  $place
+     * @return array<string, mixed>
+     */
+    public static function withPlace(array $d, ?array $place): array
+    {
+        if ($place && ($place['site'] ?? '') !== '') {
+            $d['site'] = (string) $place['site'];
+            $d['hall'] = (string) ($place['hall'] ?? '');
+            $d['hall_guessed'] = false;
+            $d['place_locked'] = true;
+        }
+
+        return $d;
     }
 
     // ------------------------------------------------------------------

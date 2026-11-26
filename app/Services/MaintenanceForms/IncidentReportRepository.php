@@ -117,9 +117,14 @@ class IncidentReportRepository
             ->limit($limit ?? self::MAX_ROWS)
             ->get();
 
+        // Cinema / hall remembered when the BBSC was numbered or locked wins
+        // over where the asset is now (it may have been moved to VP HO).
+        $places = app(IncidentDocumentService::class)->places($maintenances->pluck('id')->map(fn ($id) => (int) $id)->all());
+
         $rows = [];
         foreach ($maintenances as $m) {
-            $rows[] = self::decorate(MaintenanceFormExporter::collect($m), $now);
+            $d = MaintenanceFormExporter::withPlace(MaintenanceFormExporter::collect($m), $places[(int) $m->id] ?? null);
+            $rows[] = self::decorate($d, $now);
         }
 
         return $rows;

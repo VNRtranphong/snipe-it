@@ -32,6 +32,8 @@ class IncidentDocumentService
 
     private ?bool $ready = null;
 
+    private ?bool $placesReady = null;
+
     public function __construct(private MaintenanceFormExporter $exporter) {}
 
     /**
@@ -52,6 +54,122 @@ class IncidentDocumentService
         }
 
         return $this->ready;
+    }
+
+    /** True once the "site / hall" columns exist (second migration). */
+    public function placesReady(): bool
+    {
+        if ($this->placesReady === null) {
+            try {
+                $this->placesReady = $this->ready() && Schema::hasColumn(self::TABLE, 'site');
+            } catch (\Throwable) {
+                $this->placesReady = false;
+            }
+        }
+
+        return $this->placesReady;
+    }
+
+    /**
+     * Remembered cinema / hall per maintenance id (only those that have one).
+     * Locked biên bản made before this feature are filled in on the fly by
+     * reading "Site:" / "Hall:" back from the locked BBSC file.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, array{site: string, hall: string}>
+     */
+    public function places(array $ids): array
+    {
+        if (! $ids || ! $this->placesReady()) {
+            return [];
+        }
+
+        $out = [];
+        foreach (array_chunk($ids, 500) as $chunk) {
+            $docs = DB::table(self::TABLE)
+                ->whereIn('maintenance_id', $chunk)
+                ->where(fn ($q) => $q->whereNotNull('site')->orWhereNotNull('locked_at'))
+                ->get(['maintenance_id', 'site', 'hall', 'locked_at', 'bbsc_path']);
+            foreach ($docs as $doc) {
+                if (($doc->site ?? '') === '' && $doc->locked_at) {
+                    $doc = $this->backfillFromLockedFile($doc);
+                }
+                if (($doc->site ?? '') !== '') {
+                    $out[(int) $doc->maintenance_id] = ['site' => (string) $doc->site, 'hall' => (string) ($doc->hall ?? '')];
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Remember where the incident happened, unless already remembered.
+     * Never remembers an office / storage location (VP HO, MEP …): that
+     * would mean the asset has already been moved away from the cinema.
+     */
+    private function rememberPlace(Maintenance $maintenance, string $source, bool $overwrite = false): void
+    {
+        if (! $this->placesReady()) {
+            return;
+        }
+        $doc = $this->find((int) $maintenance->id);
+        if (! $doc || (! $overwrite && ($doc->site ?? '') !== '')) {
+            return;
+        }
+
+        $d = MaintenanceFormExporter::collect($maintenance);
+        if ($d['site'] === '' || InventoryRepository::isExcludedSite($d['site'])) {
+            return;
+        }
+
+        DB::table(self::TABLE)->where('maintenance_id', $maintenance->id)->update([
+            'site' => mb_substr($d['site'], 0, 191),
+            'hall' => mb_substr((string) $d['hall'], 0, 50),
+            'place_source' => $source,
+            'updated_at' => now(),
+        ]);
+    }
+
+    /** Read "Site: …" (A11) and "Hall: …" (G11) back from a locked BBSC file. */
+    private function backfillFromLockedFile(object $doc): object
+    {
+        $file = $doc->bbsc_path ? $this->absolute($doc->bbsc_path) : null;
+        if (! $file || ! is_file($file)) {
+            return $doc;
+        }
+
+        $tmp = sys_get_temp_dir().DIRECTORY_SEPARATOR.'bbsc_read_'.uniqid().'.xlsx';
+        try {
+            $x = new XlsxTemplateFiller($file, $tmp);
+            $site = trim((string) preg_replace('/^\s*Site\s*:?\s*/iu', '', $x->getCell(MaintenanceFormExporter::SHEET_INCIDENT, 'A11')));
+            $hall = trim((string) preg_replace('/^\s*Hall\s*:?\s*/iu', '', $x->getCell(MaintenanceFormExporter::SHEET_INCIDENT, 'G11')));
+        } catch (\Throwable $e) {
+            Log::warning('Không đọc được vị trí từ BBSC đã chốt '.$file.': '.$e->getMessage());
+
+            return $doc;
+        } finally {
+            @unlink($tmp);
+        }
+
+        if ($site !== '') {
+            DB::table(self::TABLE)->where('maintenance_id', $doc->maintenance_id)->update([
+                'site' => mb_substr($site, 0, 191),
+                'hall' => mb_substr($hall, 0, 50),
+                'place_source' => 'file',
+                'updated_at' => now(),
+            ]);
+            $doc->site = $site;
+            $doc->hall = $hall;
+        }
+
+        return $doc;
+    }
+
+    /** @return array{site: string, hall: string}|null */
+    private function placeFor(Maintenance $maintenance): ?array
+    {
+        return $this->places([(int) $maintenance->id])[(int) $maintenance->id] ?? null;
     }
 
     /** Stored row for one maintenance, or null. */
@@ -97,6 +215,8 @@ class IncidentDocumentService
         }
 
         if ($existing = $this->find((int) $maintenance->id)) {
+            $this->rememberPlace($maintenance, 'number');
+
             return $existing->number;
         }
 
@@ -147,6 +267,17 @@ class IncidentDocumentService
         throw new RuntimeException('Could not issue a BBSC number');
     }
 
+    /** Issue (or get) the number and remember the incident's place. */
+    private function numberWithPlace(Maintenance $maintenance): ?string
+    {
+        $number = $this->numberFor($maintenance);
+        if ($number !== null) {
+            $this->rememberPlace($maintenance, 'number');
+        }
+
+        return $number;
+    }
+
     /**
      * BBSC file to send: the locked copy, or a freshly generated one.
      *
@@ -159,7 +290,8 @@ class IncidentDocumentService
             return ['path' => $this->absolute($doc->bbsc_path), 'name' => basename($doc->bbsc_path), 'temp' => false];
         }
 
-        [$path, $name] = $this->exporter->incidentReport($maintenance, $this->numberFor($maintenance));
+        $number = $this->numberWithPlace($maintenance);
+        [$path, $name] = $this->exporter->incidentReport($maintenance, $number, $this->placeFor($maintenance));
 
         return ['path' => $path, 'name' => $name, 'temp' => true];
     }
@@ -176,7 +308,7 @@ class IncidentDocumentService
             return ['path' => $this->absolute($doc->report_path), 'name' => basename($doc->report_path), 'temp' => false];
         }
 
-        [$path, $name] = $this->exporter->serviceReport($maintenance);
+        [$path, $name] = $this->exporter->serviceReport($maintenance, $this->placeFor($maintenance));
 
         return ['path' => $path, 'name' => $name, 'temp' => true];
     }
@@ -200,8 +332,10 @@ class IncidentDocumentService
         $dirAbs = $this->absolute($dirRel);
         File::ensureDirectoryExists($dirAbs);
 
-        [$bbscTmp, $bbscName] = $this->exporter->incidentReport($maintenance, $number);
-        [$repTmp, $repName] = $this->exporter->serviceReport($maintenance);
+        $this->rememberPlace($maintenance, 'lock');
+        $place = $this->placeFor($maintenance);
+        [$bbscTmp, $bbscName] = $this->exporter->incidentReport($maintenance, $number, $place);
+        [$repTmp, $repName] = $this->exporter->serviceReport($maintenance, $place);
 
         $stamp = Carbon::now()->format('Ymd-His');
         $bbscRel = $dirRel.'/'.pathinfo($bbscName, PATHINFO_FILENAME).'_chot-'.$stamp.'.xlsx';
