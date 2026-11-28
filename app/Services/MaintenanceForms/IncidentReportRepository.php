@@ -332,9 +332,11 @@ class IncidentReportRepository
             $overdue[$i] += $r['overdue'] ? 1 : 0;
 
             $site = $r['site'] !== '' ? $r['site'] : '(Chưa rõ site)';
-            $sites[$site] ??= ['site' => $site, 'counts' => array_fill(0, $months, 0), 'total' => 0];
+            $sites[$site] ??= ['site' => $site, 'counts' => array_fill(0, $months, 0), 'cancelled' => array_fill(0, $months, 0), 'total' => 0, 'cancelled_total' => 0];
             $sites[$site]['counts'][$i]++;
             $sites[$site]['total']++;
+            $sites[$site]['cancelled'][$i] += (int) $r['cancelled_count'];
+            $sites[$site]['cancelled_total'] += (int) $r['cancelled_count'];
         }
 
         // Busiest sites first; ties by name.
