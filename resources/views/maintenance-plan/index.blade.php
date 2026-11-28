@@ -47,6 +47,10 @@
     .mp-dot.planned { border: 1px dashed rgba(128,128,128,.8); }
     .mp-dot.overdue { background: #dd4b39; color: #fff; }
     .mp-legend .mp-dot { margin-left: 12px; }
+    tr.mp-extra.mp-hide { display: none; }
+    .mp-more { text-align: center; margin-top: 4px; }
+    .mp-quick { margin-bottom: 12px; }
+    .mp-quick .btn { margin: 0 6px 6px 0; }
     .mp-legend .mp-dot:first-child { margin-left: 0; }
 </style>
 @endpush
@@ -66,6 +70,8 @@
         ['state' => 'ok', 'color' => 'bg-green', 'icon' => 'fa-check-circle', 'label' => 'Chưa đến hạn', 'number' => $sum['ok'], 'note' => $doneThisYear.' đợt đã xong năm nay'],
     ];
     $fmt = fn ($d) => $d instanceof \Carbon\Carbon ? $d->format('d/m/Y') : '';
+    // Only the first rạp are shown; "Xem thêm" opens the rest (filtering by rạp shows it directly).
+    $showFirst = 5;
     $marks = ['done' => '✓', 'skipped' => 'Bỏ', 'open' => '…', 'planned' => 'KH', 'overdue' => '!'];
     $markTitles = ['done' => 'Đã làm', 'skipped' => 'Bỏ qua (kỳ trước tốt)', 'open' => 'Đang thực hiện', 'planned' => 'Kế hoạch', 'overdue' => 'Quá hạn'];
 @endphp
@@ -97,6 +103,26 @@
                     </a>
                 </div>
             @endforeach
+        </div>
+
+        {{-- Thao tác nhanh: kế hoạch / lịch năm nay và năm sau --}}
+        @php $thisYear = (int) $today->format('Y'); @endphp
+        <div class="mp-quick">
+            <a href="{{ route('maintenance-plan.year', $thisYear + 1) }}" class="btn btn-primary">
+                <i class="fas fa-file-signature" aria-hidden="true"></i> Kế hoạch năm {{ $thisYear + 1 }} (phân công, trình ký)
+            </a>
+            <a href="{{ route('maintenance-plan.index', array_merge($base, ['year' => $thisYear + 1])) }}#mp-calendar" class="btn btn-default">
+                <i class="far fa-calendar-alt" aria-hidden="true"></i> Lịch năm {{ $thisYear + 1 }}
+            </a>
+            <a href="{{ route('maintenance-plan.year', $thisYear) }}" class="btn btn-default">
+                <i class="fas fa-file-signature" aria-hidden="true"></i> Kế hoạch năm {{ $thisYear }}
+            </a>
+            @if ($year !== $thisYear)
+                <a href="{{ route('maintenance-plan.index', array_diff_key($base, ['year' => 1])) }}#mp-calendar" class="btn btn-default">
+                    <i class="far fa-calendar-alt" aria-hidden="true"></i> Lịch năm {{ $thisYear }}
+                </a>
+            @endif
+            <a href="#mp-calendar" class="btn btn-default"><i class="fas fa-arrow-down" aria-hidden="true"></i> Xuống lịch năm {{ $year }}</a>
         </div>
 
         <div class="box box-default">
@@ -167,8 +193,10 @@
                             </tr>
                         </thead>
                         <tbody>
+                            @php $boardIndex = 0; @endphp
                             @forelse ($sites as $siteName => $row)
-                                <tr>
+                                @php $boardIndex++; @endphp
+                                <tr class="{{ $boardIndex > $showFirst ? 'mp-extra mp-hide' : '' }}" data-group="board">
                                     <td><strong>{{ $siteName }}</strong></td>
                                     @foreach ($systems as $key => $sys)
                                         @if ($filters['system'] === '' || $filters['system'] === $key)
@@ -246,6 +274,14 @@
                         </tbody>
                     </table>
                 </div>
+                @if (count($sites) > $showFirst)
+                    <div class="mp-more">
+                        <button type="button" class="btn btn-default btn-sm mp-more-btn" data-group="board" aria-expanded="false"
+                                data-more="Xem thêm {{ count($sites) - $showFirst }} rạp" data-less="Thu gọn">
+                            <i class="fas fa-chevron-down" aria-hidden="true"></i> <span>Xem thêm {{ count($sites) - $showFirst }} rạp</span>
+                        </button>
+                    </div>
+                @endif
             </div>
         </div>
 
@@ -279,9 +315,10 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @php $prevSite = null; @endphp
+                            @php $prevSite = null; $calSites = 0; @endphp
                             @forelse ($calendar as $c)
-                                <tr>
+                                @php if ($prevSite !== $c['site']) { $calSites++; } @endphp
+                                <tr class="{{ $calSites > $showFirst ? 'mp-extra mp-hide' : '' }}" data-group="calendar">
                                     <td class="mp-cal-site">{!! $prevSite === $c['site'] ? '' : '<strong>'.e($c['site']).'</strong>' !!}</td>
                                     <td>{{ $c['label'] }}</td>
                                     @for ($m = 1; $m <= 12; $m++)
@@ -299,6 +336,15 @@
                         </tbody>
                     </table>
                 </div>
+                @php $calSiteTotal = count(array_unique(array_column($calendar, 'site'))); @endphp
+                @if ($calSiteTotal > $showFirst)
+                    <div class="mp-more">
+                        <button type="button" class="btn btn-default btn-sm mp-more-btn" data-group="calendar" aria-expanded="false"
+                                data-more="Xem thêm {{ $calSiteTotal - $showFirst }} rạp" data-less="Thu gọn">
+                            <i class="fas fa-chevron-down" aria-hidden="true"></i> <span>Xem thêm {{ $calSiteTotal - $showFirst }} rạp</span>
+                        </button>
+                    </div>
+                @endif
             </div>
         </div>
 
@@ -309,6 +355,19 @@
 @section('moar_scripts')
 <script nonce="{{ csrf_token() }}">
     (function () {
+        document.querySelectorAll('.mp-more-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var group = btn.getAttribute('data-group');
+                var open = btn.getAttribute('aria-expanded') !== 'true';
+                document.querySelectorAll('tr.mp-extra[data-group="' + group + '"]').forEach(function (tr) { tr.classList.toggle('mp-hide', !open); });
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                btn.querySelector('span').textContent = btn.getAttribute(open ? 'data-less' : 'data-more');
+                var icon = btn.querySelector('i');
+                icon.classList.toggle('fa-chevron-down', !open);
+                icon.classList.toggle('fa-chevron-up', open);
+            });
+        });
+
         document.querySelectorAll('.mp-confirm').forEach(function (btn) {
             btn.addEventListener('click', function (e) {
                 if (!window.confirm(btn.getAttribute('data-confirm'))) { e.preventDefault(); }
