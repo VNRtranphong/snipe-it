@@ -90,6 +90,17 @@ class MaintenanceFormExporter
     {
         $data = self::withPlace(self::collect($maintenance), $place);
         $path = $this->tempPath();
+
+        // Periodic maintenance from "Lịch bảo trì": one report for the whole hall system.
+        $plan = MaintenancePlanService::forMaintenance((int) $maintenance->id);
+        if ($plan !== null) {
+            $data['site'] = (string) $plan['run']->site;
+            $data['hall'] = (string) $plan['item']->hall;
+            $this->fillMaintenanceService($data, $plan, $path);
+
+            return [$path, $this->maintenanceFileName($data, $plan)];
+        }
+
         $this->fillService($data, $path);
 
         return [$path, $this->fileName('ServiceReport', $data)];
@@ -323,12 +334,103 @@ class MaintenanceFormExporter
     }
 
     /** @param array<string, mixed> $d */
+    /**
+     * Service Report of a periodic maintenance ("Lịch bảo trì"): every device
+     * of the hall system in its box (Projector / Server / Sound), extra
+     * devices (3D, amplifier …) and the result in "B: Công việc".
+     *
+     * @param  array<string, mixed>  $d
+     * @param  array{run: object, item: object, devices: list<array<string, mixed>>, system: array<string, mixed>}  $plan
+     */
+    public function fillMaintenanceService(array $d, array $plan, string $outputPath): string
+    {
+        $s = self::SHEET_SERVICE;
+        $x = new XlsxTemplateFiller($this->templatePath, $outputPath);
+        $isSound = ($plan['run']->system ?? '') === 'sound';
+
+        $x->setCell($s, 'A1', 'Maintenance/Services Report - '.($isSound ? 'Sound' : 'Projection'));
+        $x->setCell($s, 'A2', 'Họ và Tên :  '.$d['technician']);
+        $x->setCell($s, 'A3', 'Bộ Phận    :  Kỹ Thuật');
+        $x->setCell($s, 'I2', ' Site công tác : '.$d['site']);
+        $x->setCell($s, 'I3', ' Ngày công tác : '.$d['start_date']);
+        $x->setCell($s, 'G4', 'Hall :  '.$d['hall']);
+
+        $byRole = [];
+        foreach ($plan['devices'] as $dev) {
+            $dev += ['model' => '', 'model_number' => '', 'serial' => '', 'name' => ''];
+            $byRole[$dev['role']][] = $dev;
+        }
+        $label = fn (array $dev) => self::modelLabel($dev);
+
+        $extra = [];
+        foreach ($byRole as $role => $list) {
+            foreach ($list as $i => $dev) {
+                if ($i === 0 && $role === 'projector') {
+                    $x->setRuns($s, 'B6', ['Projector : '.$label($dev), "\nSerial : ".$dev['serial']], [1 => self::SERIAL_FONT_SIZE]);
+                } elseif ($i === 0 && $role === 'server') {
+                    $x->setRuns($s, 'E6', ['Server: '.$label($dev), "\nSerial: ".$dev['serial']], [1 => self::SERIAL_FONT_SIZE]);
+                } elseif ($i === 0 && $role === 'processor') {
+                    $x->setCell($s, 'K6', 'Sound : '.$label($dev).' - SN: '.$dev['serial']);
+                } else {
+                    $extra[] = (MaintenancePlanService::ROLE_LABELS[$role] ?? $role).': '.$label($dev).($dev['serial'] !== '' ? ' - SN: '.$dev['serial'] : '');
+                }
+            }
+        }
+
+        $good = $plan['item']->good;
+        $done = $d['completed_at'] !== '';
+        $result = ! $done ? 'Đang thực hiện' : ($good === null ? 'Hoàn thành' : ((bool) $good ? 'Hệ thống tốt' : 'Cần theo dõi'));
+
+        $x->setCell($s, 'B17', 'Bảo trì định kỳ '.mb_strtolower((string) $plan['system']['label']));
+        $x->setCell($s, 'K17', 'Định kỳ '.($plan['system']['months'] ?? '').' tháng');
+        $x->setCell($s, 'M17', $result);
+        if (! empty($plan['run']->note) && $done) {
+            $x->setCell($s, 'O17', (string) $plan['run']->note);
+        }
+        foreach (array_slice($extra, 0, 4) as $i => $line) {
+            $x->setCell($s, 'B'.(18 + $i), 'Kiểm tra '.$line);
+        }
+
+        self::writeLevels($x, $s, $isSound ? (array) ($plan['levels'] ?? []) : []);
+
+        $x->fitToOnePage($s, 'landscape');
+        $x->showOnlySheet($s);
+
+        return $x->save();
+    }
+
+    /**
+     * "B chian" column O8…O14: one channel per row, "Left : 85 dB" when
+     * measured, else just the label (also clears the sample in the template).
+     *
+     * @param  array<string, float|int>  $levels
+     */
+    private static function writeLevels(XlsxTemplateFiller $x, string $sheet, array $levels): void
+    {
+        $row = 8;
+        foreach (array_keys(MaintenancePlanService::LEVELS) as $key) {
+            $x->setCell($sheet, 'O'.$row, MaintenancePlanService::levelLine($key, $levels));
+            $row++;
+        }
+    }
+
+    /** @param array{run: object} $plan */
+    private function maintenanceFileName(array $d, array $plan): string
+    {
+        $site = preg_replace('/[^A-Za-z0-9_-]+/', '', Str::ascii(str_replace(' ', '-', $d['site'])));
+        $sys = ($plan['run']->system ?? '') === 'sound' ? 'AmThanh' : 'MayChieu';
+        $date = $d['start_date'] ? str_replace('/', '-', $d['start_date']) : date('d-m-Y');
+
+        return "BaoTri_{$sys}_{$site}_Hall{$d['hall']}_{$date}.xlsx";
+    }
+
     public function fillService(array $d, string $outputPath): string
     {
         $s = self::SHEET_SERVICE;
         $x = new XlsxTemplateFiller($this->templatePath, $outputPath);
 
         $x->setCell($s, 'A2', 'Họ và Tên :  '.$d['technician']);
+        $x->setCell($s, 'A3', 'Bộ Phận    :  Kỹ Thuật');
         $x->setCell($s, 'I2', ' Site công tác : '.$d['site']);
         $x->setCell($s, 'I3', ' Ngày công tác : '.$d['start_date']);
         $x->setCell($s, 'G4', 'Hall :  '.$d['hall']);
@@ -346,19 +448,20 @@ class MaintenanceFormExporter
             $x->setCell($s, 'K6', "Sound : {$model} - SN: {$d['serial']}");
         }
 
-        // B: Công việc – "Xử lí sự cố <tên phiếu bảo trì>"
-        $x->setCell($s, 'B16', self::workLine($d['name']));
+        // B: Công việc (row 17 in the B-chain template) – "Xử lí sự cố <tên phiếu bảo trì>"
+        $x->setCell($s, 'B17', self::workLine($d['name']));
+        self::writeLevels($x, $s, []);
 
-        $x->setCell($s, 'K16', $d['is_warranty'] ? 'Bảo hành' : $d['type']);
-        $x->setCell($s, 'M16', $d['completed_at'] !== '' ? 'Hoàn thành' : 'Đang xử lý');
+        $x->setCell($s, 'K17', $d['is_warranty'] ? 'Bảo hành' : $d['type']);
+        $x->setCell($s, 'M17', $d['completed_at'] !== '' ? 'Hoàn thành' : 'Đang xử lý');
         $tech = IncidentReportRepository::cancelledCount((string) $d['cancelled_shows']);
         $cinema = IncidentReportRepository::cancelledCount((string) ($d['cancelled_cinema'] ?? ''));
         if ($tech > 0 && $cinema > 0) {
-            $x->setCell($s, 'O16', "Hủy {$tech} suất (Tech), {$cinema} suất (Rạp)");
+            $x->setCell($s, 'O17', "Hủy {$tech} suất (Tech), {$cinema} suất (Rạp)");
         } elseif ($tech > 0) {
-            $x->setCell($s, 'O16', 'Hủy '.$tech.' suất');
+            $x->setCell($s, 'O17', 'Hủy '.$tech.' suất');
         } elseif ($cinema > 0) {
-            $x->setCell($s, 'O16', 'Hủy '.$cinema.' suất (Rạp)');
+            $x->setCell($s, 'O17', 'Hủy '.$cinema.' suất (Rạp)');
         }
 
         $x->fitToOnePage($s, 'landscape');

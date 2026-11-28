@@ -608,6 +608,14 @@
                                 </a>
                             </li>
 
+                            {{-- Lịch bảo trì theo rạp --}}
+                            <li{!! (request()->is('maintenance-plan*') ? ' class="active" aria-current="page"' : '') !!}>
+                                <a href="{{ route('maintenance-plan.index') }}">
+                                    <i class="fas fa-calendar-check fa-fw" aria-hidden="true"></i>
+                                    <span>Lịch bảo trì</span>
+                                </a>
+                            </li>
+
                             {{-- Bảo hành thiết bị --}}
                             <li{!! (request()->is('warranty-report*') ? ' class="active" aria-current="page"' : '') !!}>
                                 <a href="{{ route('warranty-report.index') }}">

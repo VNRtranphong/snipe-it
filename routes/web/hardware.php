@@ -314,6 +314,40 @@ Route::get('equipment-lookup', [IncidentReportsController::class, 'inventoryPage
         ->push('Tra cứu thiết bị', route('equipment-lookup.index'))
     );
 
+// Lịch bảo trì theo rạp × hệ (máy chiếu / âm thanh). View: every logged-in user; actions: asset edit rights.
+Route::group(['prefix' => 'maintenance-plan', 'middleware' => ['auth']], function () {
+    Route::get('/', [\App\Http\Controllers\MaintenancePlanController::class, 'index'])
+        ->name('maintenance-plan.index')
+        ->breadcrumbs(fn (Trail $trail) => $trail->parent('home', route('home'))
+            ->push('Lịch bảo trì', route('maintenance-plan.index'))
+        );
+    Route::get('export', [\App\Http\Controllers\MaintenancePlanController::class, 'export'])
+        ->name('maintenance-plan.export');
+    Route::post('start', [\App\Http\Controllers\MaintenancePlanController::class, 'start'])
+        ->name('maintenance-plan.start');
+    Route::post('skip', [\App\Http\Controllers\MaintenancePlanController::class, 'skip'])
+        ->name('maintenance-plan.skip');
+    Route::get('run/{run}', [\App\Http\Controllers\MaintenancePlanController::class, 'run'])
+        ->whereNumber('run')
+        ->name('maintenance-plan.run')
+        ->breadcrumbs(fn (Trail $trail, $run) => $trail->parent('home', route('home'))
+            ->push('Lịch bảo trì', route('maintenance-plan.index'))
+            ->push('Đợt bảo trì #'.$run, route('maintenance-plan.run', $run))
+        );
+    Route::get('run/{run}/reports', [\App\Http\Controllers\MaintenancePlanController::class, 'reports'])
+        ->whereNumber('run')
+        ->name('maintenance-plan.reports');
+    Route::post('run/{run}/complete', [\App\Http\Controllers\MaintenancePlanController::class, 'complete'])
+        ->whereNumber('run')
+        ->name('maintenance-plan.complete');
+    Route::post('run/{run}/levels', [\App\Http\Controllers\MaintenancePlanController::class, 'levels'])
+        ->whereNumber('run')
+        ->name('maintenance-plan.levels');
+    Route::post('run/{run}/cancel', [\App\Http\Controllers\MaintenancePlanController::class, 'cancel'])
+        ->whereNumber('run')
+        ->name('maintenance-plan.cancel');
+});
+
 // Bảo hành thiết bị: hạn bảo hành + lịch sử sửa chữa (open to every logged-in user).
 Route::group(['prefix' => 'warranty-report', 'middleware' => ['auth']], function () {
     Route::get('/', [IncidentReportsController::class, 'warrantyPage'])
