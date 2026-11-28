@@ -46,6 +46,12 @@ class SimpleXlsxWriter
 
     public const STYLE_INT_TOTAL = 12;
 
+    public const STYLE_SIGN_TITLE = 13;
+
+    public const STYLE_SIGN_NOTE = 14;
+
+    public const STYLE_SIGN_PLACE = 15;
+
     /** float style => matching integer style */
     private const INT_STYLE = [
         self::STYLE_NUMBER => self::STYLE_INT,
@@ -90,6 +96,51 @@ class SimpleXlsxWriter
             $xmlRows[] = $this->row($r++, $opts['totalRow'], self::STYLE_TOTAL, null, self::STYLE_NUMBER_TOTAL);
         }
 
+        // Signature block for documents to be signed ("trình ký"):
+        // ['place' => 'TP.HCM, ngày … tháng … năm …', 'blocks' => [['title' => 'Người lập', 'name' => 'Phong Tran'], …]]
+        $signMerges = [];
+        if (! empty($opts['signatures']['blocks'])) {
+            $blocks = array_values($opts['signatures']['blocks']);
+            $n = count($blocks);
+            $ranges = [];
+            for ($b = 0; $b < $n; $b++) {
+                $from = intdiv($b * $cols, $n) + 1;
+                $to = max($from, intdiv(($b + 1) * $cols, $n));
+                $ranges[] = [$from, $to];
+            }
+            $r++;
+            if (! empty($opts['signatures']['place'])) {
+                [$from, $to] = $ranges[$n - 1];
+                $xmlRows[] = $this->placedRow($r, $from, (string) $opts['signatures']['place'], self::STYLE_SIGN_PLACE);
+                $signMerges[] = self::col($from).$r.':'.self::col($to).$r;
+                $r++;
+            }
+            $lines = [
+                ['key' => 'title', 'style' => self::STYLE_SIGN_TITLE, 'height' => 20],
+                ['key' => 'hint', 'style' => self::STYLE_SIGN_NOTE, 'height' => null],
+                ['key' => null, 'style' => self::STYLE_DEFAULT, 'height' => 60],
+                ['key' => 'name', 'style' => self::STYLE_SIGN_TITLE, 'height' => 20],
+            ];
+            foreach ($lines as $line) {
+                $cells = '';
+                foreach ($blocks as $b => $block) {
+                    [$from, $to] = $ranges[$b];
+                    $text = match ($line['key']) {
+                        'title' => (string) ($block['title'] ?? ''),
+                        'hint' => '(Ký, ghi rõ họ tên)',
+                        'name' => (string) ($block['name'] ?? ''),
+                        default => '',
+                    };
+                    $cells .= $this->cell(self::col($from).$r, $text, $line['style']);
+                    if ($to > $from) {
+                        $signMerges[] = self::col($from).$r.':'.self::col($to).$r;
+                    }
+                }
+                $xmlRows[] = '<row r="'.$r.'"'.($line['height'] ? ' ht="'.$line['height'].'" customHeight="1"' : '').'>'.$cells.'</row>';
+                $r++;
+            }
+        }
+
         $lastCol = self::col($cols);
         $lastDataRow = max($headerRow, $headerRow + count($rows));
 
@@ -108,6 +159,7 @@ class SimpleXlsxWriter
             $sr = empty($opts['title']) ? 1 : 2;
             $mergeRefs[] = 'A'.$sr.':'.$lastCol.$sr;
         }
+        $mergeRefs = array_merge($mergeRefs, $signMerges);
         if ($mergeRefs) {
             $merge = '<mergeCells count="'.count($mergeRefs).'">';
             foreach ($mergeRefs as $ref) {
@@ -224,6 +276,20 @@ class SimpleXlsxWriter
         return '<row r="'.$r.'"'.($height ? ' ht="'.$height.'" customHeight="1"' : '').'>'.$cells.'</row>';
     }
 
+    private function cell(string $ref, string $text, int $style): string
+    {
+        if ($text === '') {
+            return '<c r="'.$ref.'" s="'.$style.'"/>';
+        }
+
+        return '<c r="'.$ref.'" s="'.$style.'" t="inlineStr"><is><t xml:space="preserve">'.self::esc($text).'</t></is></c>';
+    }
+
+    private function placedRow(int $r, int $col, string $text, int $style): string
+    {
+        return '<row r="'.$r.'">'.$this->cell(self::col($col).$r, $text, $style).'</row>';
+    }
+
     public static function col(int $n): string
     {
         $s = '';
@@ -286,7 +352,7 @@ class SimpleXlsxWriter
             .'<top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border>'
             .'</borders>'
             .'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-            .'<cellXfs count="13">'
+            .'<cellXfs count="16">'
             // 0 default
             .'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
             // 1 title
@@ -313,6 +379,12 @@ class SimpleXlsxWriter
             .'<xf numFmtId="3" fontId="4" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>'
             // 12 int total
             .'<xf numFmtId="3" fontId="1" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            // 13 signature title / name (bold, centred, no border)
+            .'<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            // 14 signature hint (italic, centred)
+            .'<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>'
+            // 15 place / date (italic, centred)
+            .'<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center"/></xf>'
             .'</cellXfs>'
             .'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
             .'</styleSheet>';

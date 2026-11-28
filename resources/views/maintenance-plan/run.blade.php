@@ -22,7 +22,16 @@
     .mp-lv .input-group { width: 104px; }
     .mp-lv input { height: 28px; padding: 2px 6px; text-align: right; }
     .mp-lv .input-group-addon { padding: 2px 6px; font-size: 11px; }
-    .mp-lv-title { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+    .mp-lv-title { font-size: 12px; font-weight: 700; margin: 4px 0; }
+    .mp-checks { margin-bottom: 8px; font-size: 12px; }
+    .mp-checks th, .mp-checks td { padding: 3px 6px !important; vertical-align: middle !important; }
+    .mp-seg { display: inline-flex; border: 1px solid rgba(128,128,128,.45); border-radius: 4px; overflow: hidden; }
+    .mp-seg label { margin: 0; padding: 2px 8px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .mp-seg label + label { border-left: 1px solid rgba(128,128,128,.45); }
+    .mp-seg input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .mp-seg label.mp-ok.on { background: #00a65a; color: #fff; }
+    .mp-seg label.mp-bad.on { background: #dd4b39; color: #fff; }
+    .mp-seg label:focus-within { outline: 2px solid #3c8dbc; }
 </style>
 @endpush
 
@@ -33,8 +42,15 @@
     $isOpen = $run->status === 'open';
     $fmt = fn ($d) => $d ? \Carbon\Carbon::parse($d)->format('d/m/Y H:i') : '';
     $withLevels = $withLevels ?? false;
+    $withChecklist = $withChecklist ?? false;
+    $isSound = $run->system === 'sound';
     $levelLabels = \App\Services\MaintenanceForms\MaintenancePlanService::LEVELS;
-    $editLevels = $withLevels && $canEdit;
+    $soundRows = \App\Services\MaintenanceForms\MaintenancePlanService::SOUND_CHECKS;
+    $soundCols = \App\Services\MaintenanceForms\MaintenancePlanService::SOUND_CHECK_COLUMNS;
+    $projRows = \App\Services\MaintenanceForms\MaintenancePlanService::PROJECTION_CHECKS;
+    $projCols = \App\Services\MaintenanceForms\MaintenancePlanService::PROJECTION_CHECK_COLUMNS;
+    $checkValues = \App\Services\MaintenanceForms\MaintenancePlanService::CHECK_VALUES;
+    $editResults = ($withLevels || $withChecklist) && $canEdit;
 @endphp
 <div class="row">
     <div class="col-md-12">
@@ -70,7 +86,7 @@
                     <p class="text-muted">Ghi chú: {{ $run->note }}</p>
                 @endif
 
-                <form method="POST" action="{{ $isOpen ? route('maintenance-plan.complete', $run->id) : route('maintenance-plan.levels', $run->id) }}" id="mp-complete-form">
+                <form method="POST" action="{{ $isOpen ? route('maintenance-plan.complete', $run->id) : route('maintenance-plan.results', $run->id) }}" id="mp-complete-form">
                     @csrf
                     <div class="table-responsive">
                         <table class="table table-striped mp-run">
@@ -119,26 +135,108 @@
                                             @endif
                                         </td>
                                     </tr>
-                                    @if ($withLevels && ! $item['deleted'])
+                                    @if (($withLevels || $withChecklist) && ! $item['deleted'])
+                                        @php $ck = $item['checklist'] ?? []; @endphp
                                         <tr class="mp-levels">
                                             <td></td>
                                             <td colspan="4">
-                                                <div class="mp-lv-title">B-chain (dB) – Hall {{ $item['hall'] }}</div>
-                                                @foreach ($levelLabels as $key => $lbl)
-                                                    <div class="mp-lv">
-                                                        <label for="lv-{{ $item['id'] }}-{{ $key }}">{{ $lbl }}</label>
-                                                        @if ($editLevels)
-                                                            <div class="input-group">
-                                                                <input type="text" inputmode="decimal" pattern="[0-9]{1,3}([.,][0-9])?" class="form-control"
-                                                                       id="lv-{{ $item['id'] }}-{{ $key }}" name="levels[{{ $item['id'] }}][{{ $key }}]"
-                                                                       value="{{ isset($item['levels'][$key]) ? str_replace('.', ',', (string) $item['levels'][$key]) : '' }}">
-                                                                <span class="input-group-addon">dB</span>
-                                                            </div>
-                                                        @else
-                                                            <span id="lv-{{ $item['id'] }}-{{ $key }}">{{ isset($item['levels'][$key]) ? str_replace('.', ',', (string) $item['levels'][$key]).' dB' : '–' }}</span>
+                                                @if ($withChecklist && $isSound)
+                                                    <div class="mp-lv-title">A: Kiểm tra – Hall {{ $item['hall'] }}
+                                                        @if ($editResults)
+                                                            <button type="button" class="btn btn-default btn-xs mp-all-ok" data-item="{{ $item['id'] }}" style="margin-left:8px">Tất cả OK</button>
                                                         @endif
                                                     </div>
-                                                @endforeach
+                                                    <table class="table table-condensed table-bordered mp-checks" data-item="{{ $item['id'] }}">
+                                                        <thead>
+                                                            <tr>
+                                                                <th></th>
+                                                                @foreach ($soundCols as $col => $letter)
+                                                                    <th class="text-center">{{ ucfirst($col) }}</th>
+                                                                @endforeach
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach ($soundRows as $rk => $row)
+                                                                <tr>
+                                                                    <th>{{ $row['label'] }}</th>
+                                                                    @foreach ($soundCols as $col => $letter)
+                                                                        @php $v = $ck[$rk][$col] ?? ''; @endphp
+                                                                        <td class="text-center">
+                                                                            @if ($editResults)
+                                                                                <span class="mp-seg">
+                                                                                    <label class="mp-ok{{ $v === 'ok' ? ' on' : '' }}"><input type="radio" name="checks[{{ $item['id'] }}][{{ $rk }}][{{ $col }}]" value="ok" @checked($v === 'ok')> OK</label>
+                                                                                    <label class="mp-bad{{ $v === 'bad' ? ' on' : '' }}"><input type="radio" name="checks[{{ $item['id'] }}][{{ $rk }}][{{ $col }}]" value="bad" @checked($v === 'bad')> Không ổn</label>
+                                                                                </span>
+                                                                            @elseif ($v !== '')
+                                                                                <span class="{{ $v === 'bad' ? 'text-danger' : 'text-success' }}"><strong>{{ $checkValues[$v] }}</strong></span>
+                                                                            @endif
+                                                                        </td>
+                                                                    @endforeach
+                                                                </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                    </table>
+                                                @elseif ($withChecklist)
+                                                    <div class="mp-lv-title">A: Kiểm tra – Hall {{ $item['hall'] }}</div>
+                                                    <table class="table table-condensed table-bordered mp-checks">
+                                                        <thead>
+                                                            <tr>
+                                                                <th style="width:170px"></th>
+                                                                <th>Projector</th>
+                                                                <th>Server</th>
+                                                                <th>Ghi chú</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach ($projRows as $rk => $row)
+                                                                <tr>
+                                                                    <th>{{ $row['label'] }}</th>
+                                                                    @foreach ($projCols as $col => $letter)
+                                                                        @php $v = $ck[$rk][$col] ?? ''; @endphp
+                                                                        <td>
+                                                                            @if ($editResults)
+                                                                                <input type="text" class="form-control input-sm" maxlength="120" aria-label="{{ $row['label'] }} {{ $col }}"
+                                                                                       name="checks[{{ $item['id'] }}][{{ $rk }}][{{ $col }}]" value="{{ $v }}">
+                                                                            @else
+                                                                                {{ $v }}
+                                                                            @endif
+                                                                        </td>
+                                                                    @endforeach
+                                                                </tr>
+                                                            @endforeach
+                                                            <tr>
+                                                                <th>Light Source<br><small>(model, serial, giờ đã sử dụng…)</small></th>
+                                                                <td colspan="3">
+                                                                    @if ($editResults)
+                                                                        <input type="text" class="form-control input-sm" maxlength="250" aria-label="Light Source"
+                                                                               name="checks[{{ $item['id'] }}][light_source]" value="{{ $ck['light_source'] ?? '' }}">
+                                                                    @else
+                                                                        {{ $ck['light_source'] ?? '' }}
+                                                                    @endif
+                                                                </td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                @endif
+
+                                                @if ($withLevels)
+                                                    <div class="mp-lv-title">B-chain (dB) – Hall {{ $item['hall'] }}</div>
+                                                    @foreach ($levelLabels as $key => $lbl)
+                                                        <div class="mp-lv">
+                                                            <label for="lv-{{ $item['id'] }}-{{ $key }}">{{ $lbl }}</label>
+                                                            @if ($editResults)
+                                                                <div class="input-group">
+                                                                    <input type="text" inputmode="decimal" pattern="[0-9]{1,3}([.,][0-9])?" class="form-control"
+                                                                           id="lv-{{ $item['id'] }}-{{ $key }}" name="levels[{{ $item['id'] }}][{{ $key }}]"
+                                                                           value="{{ isset($item['levels'][$key]) ? str_replace('.', ',', (string) $item['levels'][$key]) : '' }}">
+                                                                    <span class="input-group-addon">dB</span>
+                                                                </div>
+                                                            @else
+                                                                <span id="lv-{{ $item['id'] }}-{{ $key }}">{{ isset($item['levels'][$key]) ? str_replace('.', ',', (string) $item['levels'][$key]).' dB' : '–' }}</span>
+                                                            @endif
+                                                        </div>
+                                                    @endforeach
+                                                @endif
                                             </td>
                                         </tr>
                                     @endif
@@ -160,11 +258,14 @@
                             <i class="fas fa-check" aria-hidden="true"></i> Hoàn thành
                         </button>
                     @endif
-                    @if ($editLevels)
-                        <button type="submit" formaction="{{ route('maintenance-plan.levels', $run->id) }}" class="btn btn-primary" style="margin-left:6px">
-                            <i class="fas fa-save" aria-hidden="true"></i> Lưu số đo B-chain
+                    @if ($editResults)
+                        <button type="submit" formaction="{{ route('maintenance-plan.results', $run->id) }}" class="btn btn-primary" style="margin-left:6px">
+                            <i class="fas fa-save" aria-hidden="true"></i> Lưu kết quả kiểm tra
                         </button>
-                        <span class="text-muted" style="font-size:12px; margin-left:6px">Nhập số dB đo được sau bảo dưỡng (vd 85 hoặc 84,5); Service Report sẽ in vào cột "B chian".</span>
+                        <span class="text-muted" style="font-size:12px; margin-left:6px">
+                            {{ $isSound ? 'Chọn OK / Không ổn cho từng mục và nhập số dB B-chain (vd 85 hoặc 84,5).' : 'Gõ nội dung kiểm tra Projector / Server / Light Source.' }}
+                            Service Report tải về sẽ in đúng các ô này.
+                        </span>
                     @endif
                 </form>
 
@@ -186,6 +287,29 @@
 @section('moar_scripts')
 <script nonce="{{ csrf_token() }}">
     (function () {
+        // OK / Không ổn segments: highlight the chosen one; any "Không ổn" unticks "Hệ thống tốt" of that hall.
+        function refresh(seg) {
+            seg.querySelectorAll('label').forEach(function (l) { l.classList.toggle('on', l.querySelector('input').checked); });
+        }
+        function syncGood(table) {
+            var id = table.getAttribute('data-item');
+            var good = document.querySelector('input[name="good[]"][value="' + id + '"]');
+            if (good && table.querySelector('input[value="bad"]:checked')) { good.checked = false; }
+        }
+        document.querySelectorAll('.mp-checks[data-item]').forEach(function (table) {
+            table.addEventListener('change', function (e) {
+                if (e.target && e.target.type === 'radio') { refresh(e.target.closest('.mp-seg')); syncGood(table); }
+            });
+        });
+        document.querySelectorAll('.mp-all-ok').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var table = document.querySelector('.mp-checks[data-item="' + btn.getAttribute('data-item') + '"]');
+                if (!table) { return; }
+                table.querySelectorAll('input[value="ok"]').forEach(function (r) { r.checked = true; });
+                table.querySelectorAll('.mp-seg').forEach(refresh);
+            });
+        });
+
         document.querySelectorAll('.mp-confirm').forEach(function (btn) {
             btn.addEventListener('click', function (e) {
                 if (!window.confirm(btn.getAttribute('data-confirm'))) { e.preventDefault(); }

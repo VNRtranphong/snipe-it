@@ -47,6 +47,8 @@ return new class extends Migration
                 $table->boolean('good')->nullable();
                 // B-chain sound levels measured after maintenance (dB): {"left": 85, ...}
                 $table->text('levels')->nullable();
+                // "A: Kiểm tra trước khi thực hiện" answers (text for projection, OK / không ổn for sound)
+                $table->text('checklist')->nullable();
                 $table->timestamps();
             });
         }

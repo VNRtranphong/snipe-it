@@ -327,6 +327,25 @@ Route::group(['prefix' => 'maintenance-plan', 'middleware' => ['auth']], functio
         ->name('maintenance-plan.start');
     Route::post('skip', [\App\Http\Controllers\MaintenancePlanController::class, 'skip'])
         ->name('maintenance-plan.skip');
+    Route::get('year/{year}', [\App\Http\Controllers\MaintenancePlanController::class, 'year'])
+        ->whereNumber('year')
+        ->name('maintenance-plan.year')
+        ->breadcrumbs(fn (Trail $trail, $year) => $trail->parent('home', route('home'))
+            ->push('Lịch bảo trì', route('maintenance-plan.index'))
+            ->push('Kế hoạch năm '.$year, route('maintenance-plan.year', $year))
+        );
+    Route::get('year/{year}/export', [\App\Http\Controllers\MaintenancePlanController::class, 'yearExport'])
+        ->whereNumber('year')
+        ->name('maintenance-plan.year.export');
+    Route::post('year/{year}/generate', [\App\Http\Controllers\MaintenancePlanController::class, 'yearGenerate'])
+        ->whereNumber('year')
+        ->name('maintenance-plan.year.generate');
+    Route::post('year/{year}/save', [\App\Http\Controllers\MaintenancePlanController::class, 'yearSave'])
+        ->whereNumber('year')
+        ->name('maintenance-plan.year.save');
+    Route::post('year/{year}/add', [\App\Http\Controllers\MaintenancePlanController::class, 'yearAdd'])
+        ->whereNumber('year')
+        ->name('maintenance-plan.year.add');
     Route::get('run/{run}', [\App\Http\Controllers\MaintenancePlanController::class, 'run'])
         ->whereNumber('run')
         ->name('maintenance-plan.run')
@@ -340,9 +359,9 @@ Route::group(['prefix' => 'maintenance-plan', 'middleware' => ['auth']], functio
     Route::post('run/{run}/complete', [\App\Http\Controllers\MaintenancePlanController::class, 'complete'])
         ->whereNumber('run')
         ->name('maintenance-plan.complete');
-    Route::post('run/{run}/levels', [\App\Http\Controllers\MaintenancePlanController::class, 'levels'])
+    Route::post('run/{run}/results', [\App\Http\Controllers\MaintenancePlanController::class, 'results'])
         ->whereNumber('run')
-        ->name('maintenance-plan.levels');
+        ->name('maintenance-plan.results');
     Route::post('run/{run}/cancel', [\App\Http\Controllers\MaintenancePlanController::class, 'cancel'])
         ->whereNumber('run')
         ->name('maintenance-plan.cancel');

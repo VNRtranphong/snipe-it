@@ -254,6 +254,9 @@
             <div class="box-header with-border">
                 <h2 class="box-title"><i class="far fa-calendar-alt" aria-hidden="true"></i> Lịch năm {{ $year }}</h2>
                 <div class="box-tools pull-right">
+                    <a href="{{ route('maintenance-plan.year', $year) }}" class="btn btn-primary btn-xs" style="margin-right:6px">
+                        <i class="fas fa-file-signature" aria-hidden="true"></i> Kế hoạch năm {{ $year }} (phân công, trình ký)
+                    </a>
                     <a href="{{ route('maintenance-plan.index', array_merge($base, ['year' => $year - 1])) }}#mp-calendar" class="btn btn-default btn-xs">&laquo; {{ $year - 1 }}</a>
                     <a href="{{ route('maintenance-plan.index', array_merge($base, ['year' => $year + 1])) }}#mp-calendar" class="btn btn-default btn-xs">{{ $year + 1 }} &raquo;</a>
                 </div>

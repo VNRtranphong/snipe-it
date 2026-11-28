@@ -6,6 +6,7 @@ use App\Models\Asset;
 use App\Models\Maintenance;
 use App\Services\MaintenanceForms\IncidentDocumentService;
 use App\Services\MaintenanceForms\MaintenancePlanService;
+use App\Services\MaintenanceForms\MaintenanceYearPlanService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -129,11 +130,14 @@ class MaintenancePlanController extends Controller
             'good.*' => 'integer',
             'note' => 'nullable|string|max:1000',
             'levels' => 'nullable|array',
+            'checks' => 'nullable|array',
         ]);
 
         try {
-            if (! empty($validated['levels']) && MaintenancePlanService::levelsReady()) {
-                $this->plan->saveLevels($run, $validated['levels']);
+            $levels = MaintenancePlanService::levelsReady() ? ($validated['levels'] ?? []) : [];
+            $checks = MaintenancePlanService::checklistReady() ? ($validated['checks'] ?? []) : [];
+            if ($levels || $checks) {
+                $this->plan->saveResults($run, $levels, $checks);
             }
             $this->plan->complete($run, array_map('intval', $validated['good'] ?? []), $validated['note'] ?? null, $request->user()?->id);
         } catch (\Throwable $e) {
@@ -145,19 +149,22 @@ class MaintenancePlanController extends Controller
         return redirect()->route('maintenance-plan.run', $run)->with('success', 'Đã hoàn thành đợt bảo trì. Ngày đến hạn kỳ sau đã được tính lại.');
     }
 
-    /** Save B-chain levels (sound runs), before or after completion. */
-    public function levels(Request $request, int $run): RedirectResponse
+    /** Save the checklist (+ B-chain levels for sound), before or after completion. */
+    public function results(Request $request, int $run): RedirectResponse
     {
         $this->authorize('update', Asset::class);
-        $validated = $request->validate(['levels' => 'nullable|array']);
+        $validated = $request->validate([
+            'levels' => 'nullable|array',
+            'checks' => 'nullable|array',
+        ]);
 
         try {
-            $this->plan->saveLevels($run, $validated['levels'] ?? []);
+            $this->plan->saveResults($run, $validated['levels'] ?? [], $validated['checks'] ?? []);
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('maintenance-plan.run', $run)->with('success', 'Đã lưu số đo B-chain. Service Report tải về sẽ có các số này.');
+        return redirect()->route('maintenance-plan.run', $run)->with('success', 'Đã lưu kết quả kiểm tra. Service Report tải về sẽ có các nội dung này.');
     }
 
     public function skip(Request $request): RedirectResponse
@@ -221,6 +228,101 @@ class MaintenancePlanController extends Controller
         $site = preg_replace('/[^A-Za-z0-9_-]+/', '', Str::ascii(str_replace(' ', '-', (string) $detail['run']->site)));
 
         return response()->download($zipPath, 'BaoTri_'.$run.'_'.$site.'.zip')->deleteFileAfterSend(true);
+    }
+
+    // ------------------------------------------------------------------
+    // Kế hoạch năm (trình ký)
+    // ------------------------------------------------------------------
+
+    public function year(Request $request, int $year, MaintenanceYearPlanService $yearPlan): View
+    {
+        $year = max(2020, min(2100, $year));
+        $data = $this->plan->load(Carbon::now());
+        $lines = MaintenanceYearPlanService::sort($yearPlan->lines($year));
+
+        return view('maintenance-plan.year', [
+            'ready' => MaintenanceYearPlanService::ready(),
+            'year' => $year,
+            'lines' => $lines,
+            'summary' => MaintenanceYearPlanService::summary($lines),
+            'meta' => $yearPlan->meta($year),
+            'halls' => self::hallCounts($data['board']),
+            'sites' => array_keys($data['board']['sites']),
+            'knownStaff' => $yearPlan->knownStaff(),
+            'canEdit' => (bool) $request->user()?->can('update', Asset::class),
+        ]);
+    }
+
+    public function yearGenerate(Request $request, int $year, MaintenanceYearPlanService $yearPlan): RedirectResponse
+    {
+        $this->authorize('update', Asset::class);
+        $today = Carbon::now();
+        $data = $this->plan->load($today);
+        try {
+            $added = $yearPlan->generate($year, MaintenancePlanService::calendar($data['board'], $data['runs'], $year, $today), $request->user()?->id);
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('maintenance-plan.year', $year)->with('success', $added ? "Đã thêm {$added} lần bảo trì theo lịch vào kế hoạch {$year}." : 'Kế hoạch đã có đủ các lần bảo trì theo lịch.');
+    }
+
+    public function yearSave(Request $request, int $year, MaintenanceYearPlanService $yearPlan): RedirectResponse
+    {
+        $this->authorize('update', Asset::class);
+        $validated = $request->validate([
+            'lines' => 'nullable|array',
+            'meta' => 'nullable|array',
+        ]);
+        try {
+            $result = $yearPlan->save($year, $validated['lines'] ?? [], $request->user()?->id);
+            $yearPlan->saveMeta($year, $validated['meta'] ?? [], $request->user()?->id);
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('maintenance-plan.year', $year)
+            ->with('success', 'Đã lưu kế hoạch '.$year.' ('.$result['saved'].' dòng'.($result['deleted'] ? ', xóa '.$result['deleted'] : '').').');
+    }
+
+    public function yearAdd(Request $request, int $year, MaintenanceYearPlanService $yearPlan): RedirectResponse
+    {
+        $this->authorize('update', Asset::class);
+        $validated = $request->validate([
+            'site' => 'required|string|max:191',
+            'system' => 'required|string|in:'.implode(',', array_keys(MaintenancePlanService::SYSTEMS)),
+            'month' => 'required|integer|min:1|max:12',
+        ]);
+        try {
+            $yearPlan->add($year, $validated['site'], $validated['system'], (int) $validated['month'], $request->user()?->id);
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('maintenance-plan.year', $year)->with('success', 'Đã thêm 1 dòng vào kế hoạch.');
+    }
+
+    public function yearExport(int $year, MaintenanceYearPlanService $yearPlan): BinaryFileResponse
+    {
+        $data = $this->plan->load(Carbon::now());
+        $lines = MaintenanceYearPlanService::sort($yearPlan->lines($year));
+        $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'kehoach_'.Str::random(16).'.xlsx';
+        MaintenanceYearPlanService::export($year, $lines, $yearPlan->meta($year), self::hallCounts($data['board']), $path);
+
+        return response()->download($path, 'Ke_hoach_bao_tri_'.$year.'.xlsx')->deleteFileAfterSend(true);
+    }
+
+    /** @return array<string, array<string, int>> site => system => halls */
+    private static function hallCounts(array $board): array
+    {
+        $out = [];
+        foreach ($board['sites'] as $site => $row) {
+            foreach ($row['systems'] as $sys => $cell) {
+                $out[$site][$sys] = count($cell['halls']);
+            }
+        }
+
+        return $out;
     }
 
     public function export(Request $request): BinaryFileResponse

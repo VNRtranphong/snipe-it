@@ -116,7 +116,98 @@ class MaintenancePlanService
         'bsr_r' => 'BSR Right',
     ];
 
+    /**
+     * "A: Kiểm tra trước khi thực hiện" of the Service Report.
+     * Projection: free text per row for Projector (col C), Server (col E), Ghi chú (col G).
+     * Sound: OK / không ổn per row for Processor, Monitor, Amplifier, Speaker (cols K…N).
+     */
+    public const PROJECTION_CHECKS = [
+        'firmware' => ['label' => 'Firmware/Software', 'row' => 8],
+        'color' => ['label' => 'Màu sắc', 'row' => 9],
+        'image' => ['label' => 'Hình ảnh', 'row' => 10],
+        'errors' => ['label' => 'Mã lỗi/Cảnh báo lỗi', 'row' => 11],
+    ];
+
+    public const PROJECTION_CHECK_COLUMNS = ['projector' => 'C', 'server' => 'E', 'note' => 'G'];
+
+    public const SOUND_CHECKS = [
+        'connection' => ['label' => 'Kết nối', 'row' => 8],
+        'power' => ['label' => 'Nguồn', 'row' => 9],
+        'errors' => ['label' => 'Báo lỗi', 'row' => 10],
+        'signal' => ['label' => 'Tín hiệu', 'row' => 11],
+    ];
+
+    public const SOUND_CHECK_COLUMNS = ['processor' => 'K', 'monitor' => 'L', 'amplifier' => 'M', 'speaker' => 'N'];
+
+    public const CHECK_VALUES = ['ok' => 'OK', 'bad' => 'Không ổn'];
+
     private static ?bool $levelsReady = null;
+
+    private static ?bool $checklistReady = null;
+
+    public static function checklistReady(): bool
+    {
+        if (self::$checklistReady === null) {
+            try {
+                self::$checklistReady = self::ready() && Schema::hasColumn(self::ITEMS, 'checklist');
+            } catch (\Throwable $e) {
+                self::$checklistReady = false;
+            }
+        }
+
+        return self::$checklistReady;
+    }
+
+    /**
+     * Keep only known rows / columns. Projection: trimmed text (max 120 chars,
+     * light source 250). Sound: 'ok' or 'bad'.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public static function cleanChecklist(string $system, array $input): array
+    {
+        $out = [];
+        if ($system === 'sound') {
+            foreach (array_keys(self::SOUND_CHECKS) as $row) {
+                foreach (array_keys(self::SOUND_CHECK_COLUMNS) as $col) {
+                    $v = (string) ($input[$row][$col] ?? '');
+                    if (isset(self::CHECK_VALUES[$v])) {
+                        $out[$row][$col] = $v;
+                    }
+                }
+            }
+
+            return $out;
+        }
+
+        foreach (array_keys(self::PROJECTION_CHECKS) as $row) {
+            foreach (array_keys(self::PROJECTION_CHECK_COLUMNS) as $col) {
+                $v = trim(preg_replace('/\s+/u', ' ', (string) ($input[$row][$col] ?? '')));
+                if ($v !== '') {
+                    $out[$row][$col] = mb_substr($v, 0, 120);
+                }
+            }
+        }
+        $light = trim((string) ($input['light_source'] ?? ''));
+        if ($light !== '') {
+            $out['light_source'] = mb_substr($light, 0, 250);
+        }
+
+        return $out;
+    }
+
+    /** True when any sound check is "không ổn". */
+    public static function hasBadCheck(array $checklist): bool
+    {
+        foreach ($checklist as $row) {
+            if (is_array($row) && in_array('bad', $row, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public static function levelsReady(): bool
     {
@@ -167,26 +258,42 @@ class MaintenancePlanService
     }
 
     /**
-     * Save B-chain levels of every hall of a run (allowed before and after completion).
+     * Save what was checked / measured for every hall of a run (allowed
+     * before and after completion): checklist ("A: Kiểm tra…") and, for
+     * the sound system, B-chain levels.
      *
-     * @param  array<int|string, array<string, mixed>>  $byItem  item id => [key => value]
+     * @param  array<int|string, array<string, mixed>>  $levelsByItem  item id => [key => value]
+     * @param  array<int|string, array<string, mixed>>  $checksByItem  item id => checklist input
      */
-    public function saveLevels(int $runId, array $byItem): int
+    public function saveResults(int $runId, array $levelsByItem, array $checksByItem): int
     {
         $this->assertReady();
-        if (! self::levelsReady()) {
-            throw new RuntimeException('Chưa chạy migrate thêm cột số đo B-chain trên server.');
+        $run = DB::table(self::RUNS)->where('id', $runId)->first();
+        if (! $run) {
+            throw new RuntimeException('Không tìm thấy đợt bảo trì.');
         }
+        if (($levelsByItem && ! self::levelsReady()) || ($checksByItem && ! self::checklistReady())) {
+            throw new RuntimeException('Chưa chạy migrate thêm cột kết quả kiểm tra trên server.');
+        }
+
         $saved = 0;
         foreach (DB::table(self::ITEMS)->where('run_id', $runId)->get(['id']) as $item) {
-            if (! array_key_exists($item->id, $byItem) && ! array_key_exists((string) $item->id, $byItem)) {
+            $update = [];
+            $levels = $levelsByItem[$item->id] ?? $levelsByItem[(string) $item->id] ?? null;
+            if (is_array($levels) && $run->system === 'sound') {
+                $clean = self::cleanLevels($levels);
+                $update['levels'] = $clean ? json_encode($clean) : null;
+            }
+            $checks = $checksByItem[$item->id] ?? $checksByItem[(string) $item->id] ?? null;
+            if (is_array($checks)) {
+                $clean = self::cleanChecklist((string) $run->system, $checks);
+                $update['checklist'] = $clean ? json_encode($clean, JSON_UNESCAPED_UNICODE) : null;
+            }
+            if (! $update) {
                 continue;
             }
-            $levels = self::cleanLevels((array) ($byItem[$item->id] ?? $byItem[(string) $item->id] ?? []));
-            DB::table(self::ITEMS)->where('id', $item->id)->update([
-                'levels' => $levels ? json_encode($levels) : null,
-                'updated_at' => Carbon::now(),
-            ]);
+            $update['updated_at'] = Carbon::now();
+            DB::table(self::ITEMS)->where('id', $item->id)->update($update);
             $saved++;
         }
 
@@ -765,6 +872,7 @@ class MaintenancePlanService
                 'good' => $item->good === null ? null : (bool) $item->good,
                 'devices' => json_decode((string) $item->devices, true) ?: [],
                 'levels' => json_decode((string) ($item->levels ?? ''), true) ?: [],
+                'checklist' => json_decode((string) ($item->checklist ?? ''), true) ?: [],
                 'maintenance_id' => (int) $item->maintenance_id,
                 'maintenance_name' => (string) ($m?->name ?? ''),
                 'deleted' => $m === null || $m->trashed(),
@@ -779,6 +887,7 @@ class MaintenancePlanService
             'items' => $items,
             // B-chain inputs only for the sound system.
             'withLevels' => $run->system === 'sound' && self::levelsReady(),
+            'withChecklist' => self::checklistReady(),
         ];
     }
 
@@ -808,6 +917,7 @@ class MaintenancePlanService
                 'item' => $item,
                 'devices' => json_decode((string) $item->devices, true) ?: [],
                 'levels' => json_decode((string) ($item->levels ?? ''), true) ?: [],
+                'checklist' => json_decode((string) ($item->checklist ?? ''), true) ?: [],
                 'system' => self::SYSTEMS[$run->system] ?? ['label' => (string) $run->system, 'months' => 0, 'roles' => []],
             ];
         } catch (\Throwable $e) {

@@ -392,6 +392,7 @@ class MaintenanceFormExporter
         }
 
         self::writeLevels($x, $s, $isSound ? (array) ($plan['levels'] ?? []) : []);
+        self::writeChecklist($x, $s, $isSound, (array) ($plan['checklist'] ?? []));
 
         $x->fitToOnePage($s, 'landscape');
         $x->showOnlySheet($s);
@@ -411,6 +412,42 @@ class MaintenanceFormExporter
         foreach (array_keys(MaintenancePlanService::LEVELS) as $key) {
             $x->setCell($sheet, 'O'.$row, MaintenancePlanService::levelLine($key, $levels));
             $row++;
+        }
+    }
+
+    /**
+     * "A: Kiểm tra trước khi thực hiện": projector / server / ghi chú text
+     * (rows 8–11, cols C / E / G, light source in B12) or the sound grid
+     * OK / Không ổn (rows 8–11, cols K…N).
+     *
+     * @param  array<string, mixed>  $checklist
+     */
+    private static function writeChecklist(XlsxTemplateFiller $x, string $sheet, bool $isSound, array $checklist): void
+    {
+        if ($isSound) {
+            foreach (MaintenancePlanService::SOUND_CHECKS as $key => $row) {
+                foreach (MaintenancePlanService::SOUND_CHECK_COLUMNS as $col => $letter) {
+                    $v = $checklist[$key][$col] ?? null;
+                    if ($v !== null && isset(MaintenancePlanService::CHECK_VALUES[$v])) {
+                        $x->setCell($sheet, $letter.$row['row'], MaintenancePlanService::CHECK_VALUES[$v]);
+                    }
+                }
+            }
+
+            return;
+        }
+
+        foreach (MaintenancePlanService::PROJECTION_CHECKS as $key => $row) {
+            foreach (MaintenancePlanService::PROJECTION_CHECK_COLUMNS as $col => $letter) {
+                $v = trim((string) ($checklist[$key][$col] ?? ''));
+                if ($v !== '') {
+                    $x->setCell($sheet, $letter.$row['row'], $v);
+                }
+            }
+        }
+        $light = trim((string) ($checklist['light_source'] ?? ''));
+        if ($light !== '') {
+            $x->setCell($sheet, 'B12', 'Light Source (model, serial, giờ đã sử dụng ….) : '.$light);
         }
     }
 
@@ -500,8 +537,10 @@ class MaintenanceFormExporter
     /** @param array<string, mixed> $d */
     public static function modelLabel(array $d): string
     {
-        $model = $d['model'];
-        if ($d['model_number'] !== '' && ! str_contains($model, $d['model_number'])) {
+        $model = (string) $d['model'];
+        // "CP 950" + model number "CP950" is the same thing: compare without spaces / dashes / case.
+        $squash = fn (string $v): string => strtolower((string) preg_replace('/[\s\-_.\/]+/u', '', $v));
+        if ($d['model_number'] !== '' && ! str_contains($squash($model), $squash((string) $d['model_number']))) {
             $model = trim($model.' ('.$d['model_number'].')');
         }
 
