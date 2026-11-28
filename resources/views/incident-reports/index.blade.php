@@ -36,12 +36,27 @@
     .ir-heat a.ir-heat-link { color: inherit; display: block; text-decoration: none; }
     .ir-heat a.ir-heat-link:hover { text-decoration: underline; }
     .ir-heat td:hover { outline: 2px solid #3c8dbc; outline-offset: -2px; }
-    /* Each month = 2 cells: số sự cố (blue, like the chart bars) | suất hủy Tech (purple, like the chart line). */
-    .ir-heat td.ir-hi { border-right-style: dashed !important; border-right-color: rgba(128,128,128,.35) !important; }
+    /* Each month = 2 cells: số sự cố (blue, like the chart bars) | suất hủy Tech (amber, like the chart line). */
+    .ir-heat { border-collapse: separate; border-spacing: 0; }
+    .ir-heat th, .ir-heat td { border-color: rgba(128,128,128,.18) !important; }
+    .ir-heat td.ir-hi, .ir-heat th.ir-hsub.i { border-right: 0 !important; }
+    .ir-heat td.ir-hs, .ir-heat th.ir-hsub.s, .ir-heat th.ir-hmonth { border-right: 2px solid rgba(128,128,128,.45) !important; }
     .ir-heat td.ir-hs { border-left: 0 !important; }
-    .ir-heat th.ir-hsub { font-size: 10px; font-weight: 600; padding: 2px 4px !important; opacity: .85; }
-    .ir-heat th.ir-hsub.i { color: #3c8dbc; }
-    .ir-heat th.ir-hsub.s { color: #8f8bd6; }
+    .ir-heat .ir-alt { background-color: rgba(128,128,128,.07); }
+    .ir-heat tbody tr:hover td { background-color: rgba(60,141,188,.10); }
+    .ir-heat th.ir-hsub { font-size: 10px; font-weight: 700; padding: 2px 4px !important; letter-spacing: .3px; }
+    .ir-heat th.ir-hsub.i { color: #4ea8de; }
+    .ir-heat th.ir-hsub.s { color: #f0a30a; }
+    .ir-heat td.ir-hi, .ir-heat td.ir-hs { min-width: 34px; font-variant-numeric: tabular-nums; }
+    .ir-heat .ir-zero { opacity: .35; }
+    .ir-heat .ir-soft-i, .ir-heat .ir-soft-s, .ir-heat .ir-strong-i, .ir-heat .ir-strong-s { font-weight: 700; }
+    .ir-heat .ir-soft-i, .ir-heat .ir-tot-i { color: #1d6fa5; }
+    .ir-heat .ir-soft-s, .ir-heat .ir-tot-s { color: #b36b00; }
+    html[data-theme="dark"] .ir-heat .ir-soft-i, html[data-theme="dark"] .ir-heat .ir-tot-i { color: #6cb8ea; }
+    html[data-theme="dark"] .ir-heat .ir-soft-s, html[data-theme="dark"] .ir-heat .ir-tot-s { color: #f5b73b; }
+    .ir-heat .ir-strong-i { color: #ffffff; }
+    .ir-heat .ir-strong-s { color: #1f1f1f; }
+    .ir-heat td.ir-tot { font-weight: 700; font-size: 13px; }
     .ir-heat-legend span { display: inline-block; width: 12px; height: 12px; vertical-align: -2px; margin: 0 4px 0 10px; border-radius: 2px; }
     .ir-bulkbar { margin-bottom: 10px; }
     .ir-bulkbar .btn { margin-right: 4px; margin-bottom: 4px; }
@@ -241,15 +256,17 @@
                 $heatMax = max($heatMax, max($ts['counts'] ?: [0]));
                 $heatCancelMax = max($heatCancelMax, max($ts['cancelled'] ?: [0]));
             }
-            // Same colours as the trend chart: bars = số sự cố (blue), line = suất bị hủy Tech (purple).
+            // Same colours as the trend chart: bars = số sự cố (blue), line = suất bị hủy Tech (amber).
+            // Low values: light tint + coloured number; high values: solid fill + contrasting bold number.
             $heatCell = function (int $value, int $max, string $rgb): string {
                 if ($value <= 0 || $max <= 0) {
                     return '';
                 }
-                $alpha = round(0.15 + 0.7 * $value / $max, 2);
 
-                return 'background-color: rgba('.$rgb.','.$alpha.');'.($alpha > 0.5 ? 'color:#fff;font-weight:600;' : '');
+                return 'background-color: rgba('.$rgb.','.round(0.18 + 0.82 * $value / $max, 2).');';
             };
+            // Text tone class: light tint => coloured number (theme aware), strong fill => contrasting number.
+            $heatTone = fn (int $value, int $max, string $kind): string => $value <= 0 || $max <= 0 ? '' : ($value / $max >= 0.45 ? ' ir-strong-'.$kind : ' ir-soft-'.$kind);
             $heatTop = 15;
         @endphp
         <div class="box box-default" id="ir-trend">
@@ -270,22 +287,22 @@
 
                 @if (count($trend['sites']))
                     <h4 style="margin-top:18px">Số sự cố &amp; suất hủy theo rạp × tháng
-                        <small class="ir-heat-legend"><span style="background:rgba(60,141,188,.85)"></span>Số sự cố<span style="background:rgba(96,92,168,.85)"></span>Suất bị hủy (Tech)</small>
+                        <small class="ir-heat-legend"><span style="background:rgba(60,141,188,.85)"></span>Số sự cố<span style="background:#f0a30a"></span>Suất bị hủy (Tech)</small>
                     </h4>
                     <div class="table-responsive">
                         <table class="table table-bordered table-condensed ir-heat">
                             <thead>
                                 <tr>
                                     <th class="ir-heat-site" rowspan="2" style="vertical-align:bottom">Rạp</th>
-                                    @foreach ($trend['labels'] as $lbl)
-                                        <th colspan="2">{{ $lbl }}</th>
+                                    @foreach ($trend['labels'] as $mi => $lbl)
+                                        <th colspan="2" class="ir-hmonth{{ $mi % 2 ? ' ir-alt' : '' }}">{{ $lbl }}</th>
                                     @endforeach
                                     <th colspan="2">Tổng</th>
                                 </tr>
                                 <tr>
-                                    @foreach ($trend['labels'] as $lbl)
-                                        <th class="ir-hsub i" title="Số sự cố">SC</th>
-                                        <th class="ir-hsub s" title="Suất bị hủy (Tech)">Hủy</th>
+                                    @foreach ($trend['labels'] as $mi => $lbl)
+                                        <th class="ir-hsub i{{ $mi % 2 ? ' ir-alt' : '' }}" title="Số sự cố">SC</th>
+                                        <th class="ir-hsub s{{ $mi % 2 ? ' ir-alt' : '' }}" title="Suất bị hủy (Tech)">Hủy</th>
                                     @endforeach
                                     <th class="ir-hsub i" title="Số sự cố">SC</th>
                                     <th class="ir-hsub s" title="Suất bị hủy (Tech)">Hủy</th>
@@ -320,7 +337,7 @@
                                         </td>
                                         @foreach ($ts['counts'] as $mi => $c)
                                             @php $sc = (int) ($ts['cancelled'][$mi] ?? 0); @endphp
-                                            <td class="ir-hi" style="{{ $heatCell($c, $heatMax, '60,141,188') }}">
+                                            <td class="ir-hi{{ $mi % 2 ? ' ir-alt' : '' }}{{ $heatTone($c, $heatMax, 'i') }}" style="{{ $heatCell($c, $heatMax, '60,141,188') }}">
                                                 @if ($c > 0 && $linkable)
                                                     <a href="{{ $heatLink($ts['site'], $monthFrom($trend['keys'][$mi]), $monthTo($trend['keys'][$mi])) }}" class="ir-heat-link"
                                                        title="Xem {{ $c }} sự cố của {{ $ts['site'] }} tháng {{ $trend['labels'][$mi] }}">{{ $c }}</a>
@@ -328,16 +345,16 @@
                                                     {{ $c ?: '' }}
                                                 @endif
                                             </td>
-                                            <td class="ir-hs" style="{{ $heatCell($sc, $heatCancelMax, '96,92,168') }}" title="{{ $c > 0 ? $sc.' suất bị hủy (Tech)' : '' }}">{{ $c > 0 ? $sc : '' }}</td>
+                                            <td class="ir-hs{{ $mi % 2 ? ' ir-alt' : '' }}{{ $heatTone($sc, $heatCancelMax, 's') }}" style="{{ $heatCell($sc, $heatCancelMax, '240,163,10') }}" title="{{ $c > 0 ? $sc.' suất bị hủy (Tech)' : '' }}">@if ($c > 0)<span class="{{ $sc === 0 ? 'ir-zero' : '' }}">{{ $sc }}</span>@endif</td>
                                         @endforeach
-                                        <td class="ir-hi">
+                                        <td class="ir-hi ir-tot ir-tot-i">
                                             @if ($linkable)
                                                 <a href="{{ $heatLink($ts['site'], $monthFrom($firstKey), $monthTo($lastKey)) }}" class="ir-heat-link" title="Xem cả {{ $ts['total'] }} sự cố"><strong>{{ $ts['total'] }}</strong></a>
                                             @else
                                                 <strong>{{ $ts['total'] }}</strong>
                                             @endif
                                         </td>
-                                        <td class="ir-hs"><strong>{{ $ts['cancelled_total'] ?? 0 }}</strong></td>
+                                        <td class="ir-hs ir-tot ir-tot-s"><span class="{{ ($ts['cancelled_total'] ?? 0) === 0 ? 'ir-zero' : '' }}">{{ $ts['cancelled_total'] ?? 0 }}</span></td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -687,7 +704,7 @@
                 labels: trend.labels,
                 datasets: [
                     { type: 'line', label: 'Suất bị hủy (Tech)', data: trend.cancelled, yAxisID: 'shows',
-                      borderColor: '#605ca8', backgroundColor: 'rgba(96,92,168,0.15)', pointBackgroundColor: '#605ca8',
+                      borderColor: '#f0a30a', backgroundColor: 'rgba(240,163,10,0.15)', pointBackgroundColor: '#f0a30a',
                       borderWidth: 2, fill: false, lineTension: 0.2 },
                     { label: 'Số sự cố', data: trend.incidents, yAxisID: 'count', backgroundColor: 'rgba(60,141,188,0.85)' },
                     { label: 'Trong đó quá 24h', data: trend.overdue, yAxisID: 'count', backgroundColor: 'rgba(221,75,57,0.85)' }
