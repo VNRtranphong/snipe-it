@@ -15,7 +15,8 @@ use Illuminate\Support\Str;
  *  - maintenance: type or name says "Maintenance / Bảo trì / Bảo dưỡng"
  *    (the create form tells users to name periodic work that way);
  *    everything else is an incident ("sự cố").
- *  - cancelled: shows cancelled ("Số suất hủy"), incidents only.
+ *  - cancelled: shows cancelled for Tech ("Số suất hủy tính cho Tech"), incidents only.
+ *  - cancelled_cinema: "Số suất hủy tính cho Rạp" – separate, never added to the Tech numbers.
  *  - overdue: incidents that took > 24h (open ones count up to now).
  *  - cancelled_over24: cancelled shows caused by those overdue incidents.
  *  - Same period ("cùng kỳ"): every year counted from 01/01 to the same
@@ -26,8 +27,9 @@ class IncidentStatsService
     public const METRICS = [
         'incidents' => 'Số sự cố',
         'maintenance' => 'Số lần maintenance',
-        'cancelled' => 'Số suất hủy',
-        'cancelled_over24' => 'Suất hủy do sự cố quá 24h',
+        'cancelled' => 'Số suất hủy (Tech)',
+        'cancelled_over24' => 'Suất hủy (Tech) do sự cố quá 24h',
+        'cancelled_cinema' => 'Số suất hủy (Rạp)',
         'overdue' => 'Sự cố quá 24h',
     ];
 
@@ -62,6 +64,7 @@ class IncidentStatsService
             'maintenance' => $maint ? 1 : 0,
             'cancelled' => $maint ? 0 : (int) $r['cancelled_count'],
             'cancelled_over24' => (! $maint && $r['overdue']) ? (int) $r['cancelled_count'] : 0,
+            'cancelled_cinema' => $maint ? 0 : (int) ($r['cancelled_cinema_count'] ?? 0),
             'overdue' => (! $maint && $r['overdue']) ? 1 : 0,
             default => 0,
         };

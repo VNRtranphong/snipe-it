@@ -64,6 +64,7 @@ class MaintenancesTransformer
                 'name' => e($assetmaintenance->asset->defaultLoc->name),
             ] : null,
             'notes' => ($assetmaintenance->notes) ? Helper::parseEscapedMarkedownInline($assetmaintenance->notes) : null,
+            'cancelled_shows_cinema' => $assetmaintenance->cancelled_shows_cinema !== null ? (int) $assetmaintenance->cancelled_shows_cinema : null,
             'supplier' => ($assetmaintenance->supplier) ? [
                 'id' => $assetmaintenance->supplier->id,
                 'name' => e($assetmaintenance->supplier->name),
@@ -175,6 +176,7 @@ class MaintenancesTransformer
             'title' => ($assetmaintenance->name) ? e($assetmaintenance->name) : null, // legacy to not change the shape of the API
             'location' => $locationName ? e($locationName) : null,
             'notes' => ($assetmaintenance->notes) ? Helper::parseEscapedMarkedownInline($assetmaintenance->notes) : null,
+            'cancelled_shows_cinema' => $assetmaintenance->cancelled_shows_cinema !== null ? (int) $assetmaintenance->cancelled_shows_cinema : null,
             'supplier' => $supplierName ? e($supplierName) : null,
             'url' => ($assetmaintenance->url) ? e($assetmaintenance->url) : null,
             'cost' => Helper::formatCurrencyOutput($assetmaintenance->cost),

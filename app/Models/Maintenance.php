@@ -62,6 +62,8 @@ class Maintenance extends SnipeModel implements CompanyableChild
         'start_date' => 'required|date',
         'expected_completion_date' => 'date|nullable|after_or_equal:start_date',
         'notes' => 'string|nullable',
+        // "Số suất hủy tính cho Rạp" (notes = "Số suất hủy tính cho Tech").
+        'cancelled_shows_cinema' => 'nullable|integer|min:0',
         'cost' => 'numeric|nullable|gte:0|max:99999999999999999.99',
         'url' => 'nullable|string',
         'responsible_party_id' => 'nullable|integer|exists:users,id',
@@ -103,6 +105,7 @@ class Maintenance extends SnipeModel implements CompanyableChild
         'completion_date',
         'asset_maintenance_time',
         'notes',
+        'cancelled_shows_cinema',
         'cost',
         'url',
         'checked_out_to_id',
@@ -381,6 +384,11 @@ class Maintenance extends SnipeModel implements CompanyableChild
             $value = null;
         }
         $this->attributes['notes'] = $value;
+    }
+
+    public function setCancelledShowsCinemaAttribute($value)
+    {
+        $this->attributes['cancelled_shows_cinema'] = ($value === '' || $value === null) ? null : (int) $value;
     }
 
     public function setExpectedCompletionDateAttribute($value)

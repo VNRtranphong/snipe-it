@@ -124,10 +124,28 @@ class MaintenanceFormExporter
      *
      * Field meaning in this install (see MaintenancesPresenter):
      *  - `url`   column is labelled "Ghi chú"      => incident description
-     *  - `notes` column is labelled "Số suất hủy"  => cancelled shows
+     *  - `notes` column is labelled "Số suất hủy tính cho Tech" => cancelled shows (Tech)
+     *  - `cancelled_shows_cinema` = "Số suất hủy tính cho Rạp"   => kept apart, never in Tech totals
      *
      * @return array<string, mixed>
      */
+    /**
+     * BBSC "Số xuất chiếu ảnh hưởng/ hủy": the Tech number as before; when the
+     * cinema also has cancelled shows, both are written on separate lines.
+     *
+     * @param  array<string, mixed>  $d
+     */
+    public static function cancelledText(array $d): string
+    {
+        $tech = trim((string) ($d['cancelled_shows'] ?? ''));
+        $cinema = IncidentReportRepository::cancelledCount((string) ($d['cancelled_cinema'] ?? ''));
+        if ($cinema <= 0) {
+            return $tech;
+        }
+
+        return 'Tech: '.($tech !== '' ? $tech : '0')."\nRạp: ".$cinema;
+    }
+
     public static function collect(Maintenance $maintenance): array
     {
         $asset = $maintenance->asset;
@@ -146,6 +164,7 @@ class MaintenanceFormExporter
             'name' => (string) $maintenance->name,
             'description' => trim((string) $maintenance->url),
             'cancelled_shows' => trim(strip_tags((string) $maintenance->notes)),
+            'cancelled_cinema' => trim((string) ($maintenance->cancelled_shows_cinema ?? '')),
             'type' => (string) ($maintenance->maintenanceType?->name ?? ''),
             'is_warranty' => (bool) $maintenance->is_warranty,
             'supplier' => (string) ($maintenance->supplier?->name ?? ''),
@@ -280,7 +299,7 @@ class MaintenanceFormExporter
             $description .= "\n".$d['description'];
         }
         $x->setCell($s, 'B14', $description);
-        $x->setCell($s, 'H14', $d['cancelled_shows']);
+        $x->setCell($s, 'H14', self::cancelledText($d));
         $x->setCell($s, 'J14', ''); // Ghi chú: để trống cho ghi tay
 
         // Grow the row when the description is long (template row = 84.6pt ≈ 5 lines).
@@ -332,8 +351,14 @@ class MaintenanceFormExporter
 
         $x->setCell($s, 'K16', $d['is_warranty'] ? 'Bảo hành' : $d['type']);
         $x->setCell($s, 'M16', $d['completed_at'] !== '' ? 'Hoàn thành' : 'Đang xử lý');
-        if ($d['cancelled_shows'] !== '' && $d['cancelled_shows'] !== '0') {
-            $x->setCell($s, 'O16', 'Hủy '.$d['cancelled_shows'].' suất');
+        $tech = IncidentReportRepository::cancelledCount((string) $d['cancelled_shows']);
+        $cinema = IncidentReportRepository::cancelledCount((string) ($d['cancelled_cinema'] ?? ''));
+        if ($tech > 0 && $cinema > 0) {
+            $x->setCell($s, 'O16', "Hủy {$tech} suất (Tech), {$cinema} suất (Rạp)");
+        } elseif ($tech > 0) {
+            $x->setCell($s, 'O16', 'Hủy '.$tech.' suất');
+        } elseif ($cinema > 0) {
+            $x->setCell($s, 'O16', 'Hủy '.$cinema.' suất (Rạp)');
         }
 
         $x->fitToOnePage($s, 'landscape');

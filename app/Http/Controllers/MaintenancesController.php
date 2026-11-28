@@ -15,6 +15,7 @@ use App\Services\MaintenanceForms\IncidentDocumentService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -105,6 +106,7 @@ class MaintenancesController extends Controller
             $maintenance->is_warranty = $request->input('is_warranty');
             $maintenance->cost = $request->input('cost');
             $maintenance->notes = $request->input('notes');
+            $this->fillCinemaCancelled($maintenance, $request);
             $maintenance->url = $request->input('url');
 
             // Save the asset maintenance data
@@ -208,6 +210,7 @@ class MaintenancesController extends Controller
         $maintenance->is_warranty = $request->input('is_warranty', 0);
         $maintenance->cost = $request->input('cost');
         $maintenance->notes = $request->input('notes');
+        $this->fillCinemaCancelled($maintenance, $request);
         $maintenance->asset_maintenance_type = $request->input('asset_maintenance_type');
         $maintenance->maintenance_type_id = $request->input('maintenance_type_id');
         $maintenance->name = $request->input('name');
@@ -306,6 +309,19 @@ class MaintenancesController extends Controller
     /**
      * Stores any generic file uploads submitted from the maintenance form.
      */
+    /**
+     * "Số suất hủy tính cho Rạp" – only once the column exists (migration run),
+     * so the form keeps working before `php artisan migrate`.
+     */
+    private function fillCinemaCancelled(Maintenance $maintenance, Request $request): void
+    {
+        static $hasColumn = null;
+        $hasColumn ??= Schema::hasColumn('maintenances', 'cancelled_shows_cinema');
+        if ($hasColumn) {
+            $maintenance->cancelled_shows_cinema = $request->input('cancelled_shows_cinema');
+        }
+    }
+
     private function storeUploadedFiles(ImageUploadRequest $request, Maintenance $maintenance): void
     {
         if (! $request->hasFile('file')) {

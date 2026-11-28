@@ -928,4 +928,6 @@ return [
     'token_unrevoked' => 'API token reinstated',
     'token_revoked' => 'API token revoked',
 
+    'huy' => 'Số Suất Hủy Tính Cho Tech',
+    'huy_cinema' => 'Số Suất Hủy Tính Cho Rạp',
 ];

@@ -40,7 +40,7 @@ class IncidentSummaryExporter
         $headers = [
             'STT', 'Số biên bản', 'Bắt đầu', 'Hoàn thành', 'Site', 'Hall', 'Loại TB', 'Thiết bị', 'Model', 'Serial', 'Mã TS',
             'Sự cố', 'Mô tả / Ghi chú', 'Part / Loại', 'Bảo hành', 'Người phụ trách',
-            'Thời gian xử lý (giờ)', 'Thời gian xử lý', 'Quá 24h', 'Số suất hủy', 'Trạng thái',
+            'Thời gian xử lý (giờ)', 'Thời gian xử lý', 'Quá 24h', 'Số suất hủy (Tech)', 'Số suất hủy (Rạp)', 'Trạng thái',
         ];
 
         $data = [];
@@ -67,6 +67,7 @@ class IncidentSummaryExporter
                 $r['duration_label'],
                 $r['overdue'] ? 'Có' : '',
                 (int) $r['cancelled_count'],
+                (int) ($r['cancelled_cinema_count'] ?? 0),
                 $r['status_label'],
             ];
             if ($r['overdue']) {
@@ -80,26 +81,27 @@ class IncidentSummaryExporter
         $total[11] = $stats['total'].' sự cố';
         $total[18] = $stats['overdue'];
         $total[19] = $stats['cancelled'];
-        $total[20] = $stats['open'].' đang xử lý';
+        $total[20] = $stats['cancelled_cinema'];
+        $total[21] = $stats['open'].' đang xử lý';
 
         $writer = new SimpleXlsxWriter;
         $writer->addSheet('Danh sách sự cố', $headers, $data, [
             'title' => 'TỔNG HỢP SỰ CỐ KỸ THUẬT',
             'subtitle' => $subtitle,
-            'widths' => [5, 26, 16, 16, 18, 6, 11, 28, 18, 16, 12, 24, 45, 14, 9, 18, 11, 15, 8, 9, 12],
+            'widths' => [5, 26, 16, 16, 18, 6, 11, 28, 18, 16, 12, 24, 45, 14, 9, 18, 11, 15, 8, 11, 11, 12],
             'rowStyles' => $styles,
             'totalRow' => $rows ? $total : null,
         ]);
 
         $siteRows = [];
         foreach (IncidentReportRepository::bySite($rows) as $s) {
-            $siteRows[] = [$s['site'], $s['total'], $s['open'], $s['overdue'], $s['cancelled']];
+            $siteRows[] = [$s['site'], $s['total'], $s['open'], $s['overdue'], $s['cancelled'], $s['cancelled_cinema']];
         }
-        $writer->addSheet('Theo site', ['Site', 'Số sự cố', 'Đang xử lý', 'Quá 24h', 'Số suất hủy'], $siteRows, [
+        $writer->addSheet('Theo site', ['Site', 'Số sự cố', 'Đang xử lý', 'Quá 24h', 'Số suất hủy (Tech)', 'Số suất hủy (Rạp)'], $siteRows, [
             'title' => 'TỔNG HỢP THEO SITE',
             'subtitle' => 'Thời gian: '.$period,
-            'widths' => [30, 12, 12, 12, 12],
-            'totalRow' => $siteRows ? ['Tổng', $stats['total'], $stats['open'], $stats['overdue'], $stats['cancelled']] : null,
+            'widths' => [30, 12, 12, 12, 16, 16],
+            'totalRow' => $siteRows ? ['Tổng', $stats['total'], $stats['open'], $stats['overdue'], $stats['cancelled'], $stats['cancelled_cinema']] : null,
         ]);
 
         return $writer->save($path);

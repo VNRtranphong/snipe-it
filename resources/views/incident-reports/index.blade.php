@@ -78,8 +78,8 @@
                  'number' => $stats['open'], 'note' => null],
                 ['status' => 'overdue', 'color' => 'bg-red', 'icon' => 'fa-exclamation-triangle', 'label' => 'Quá '.$overdueHours.'h',
                  'number' => $stats['overdue'], 'note' => $stats['overdue_open'].' vẫn chưa xong'],
-                ['status' => 'cancelled', 'color' => 'bg-purple', 'icon' => 'fa-film', 'label' => 'Suất bị hủy',
-                 'number' => $stats['cancelled'], 'note' => 'trong '.$stats['cancelled_incidents'].' sự cố'],
+                ['status' => 'cancelled', 'color' => 'bg-purple', 'icon' => 'fa-film', 'label' => 'Suất bị hủy (Tech)',
+                 'number' => $stats['cancelled'], 'note' => 'trong '.$stats['cancelled_incidents'].' sự cố · Rạp: '.($stats['cancelled_cinema'] ?? 0).' suất'],
             ];
         @endphp
         @php
@@ -358,7 +358,8 @@
                                     <th>Thiết bị</th>
                                     <th>Sự cố</th>
                                     <th>Thời gian xử lý</th>
-                                    <th class="text-center">Suất hủy</th>
+                                    <th class="text-center">Suất hủy<br><small>Tech</small></th>
+                                    <th class="text-center">Suất hủy<br><small>Rạp</small></th>
                                     <th>Phụ trách</th>
                                     <th>Trạng thái</th>
                                     <th>Biên bản</th>
@@ -397,6 +398,7 @@
                                         @endif
                                     </td>
                                     <td class="text-center">{{ $r['cancelled_count'] ?: '' }}</td>
+                                    <td class="text-center">{{ ($r['cancelled_cinema_count'] ?? 0) ?: '' }}</td>
                                     <td>{{ $r['technician'] }}</td>
                                     <td>
                                         @if (! empty($r['is_maintenance']))
@@ -447,7 +449,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="11" class="text-center text-muted" style="padding:24px">Không có sự cố nào khớp bộ lọc.</td></tr>
+                                <tr><td colspan="12" class="text-center text-muted" style="padding:24px">Không có sự cố nào khớp bộ lọc.</td></tr>
                             @endforelse
                             </tbody>
                         </table>
@@ -652,7 +654,7 @@
             data: {
                 labels: trend.labels,
                 datasets: [
-                    { type: 'line', label: 'Suất bị hủy', data: trend.cancelled, yAxisID: 'shows',
+                    { type: 'line', label: 'Suất bị hủy (Tech)', data: trend.cancelled, yAxisID: 'shows',
                       borderColor: '#605ca8', backgroundColor: 'rgba(96,92,168,0.15)', pointBackgroundColor: '#605ca8',
                       borderWidth: 2, fill: false, lineTension: 0.2 },
                     { label: 'Số sự cố', data: trend.incidents, yAxisID: 'count', backgroundColor: 'rgba(60,141,188,0.85)' },

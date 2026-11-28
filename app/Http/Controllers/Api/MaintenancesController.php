@@ -138,6 +138,7 @@ class MaintenancesController extends Controller
             'completion_date',
             'completed_at',
             'notes',
+            'cancelled_shows_cinema',
             'asset_tag',
             'asset_name',
             'serial',

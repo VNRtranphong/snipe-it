@@ -200,6 +200,12 @@ class MaintenancesPresenter extends Presenter
                 'sortable' => true,
                 'title' => trans('general.huy'),
             ], [
+                'field' => 'cancelled_shows_cinema',
+                'scope' => 'col',
+                'searchable' => false,
+                'sortable' => true,
+                'title' => trans('general.huy_cinema'),
+            ], [
                 'field' => 'is_warranty',
                 'scope' => 'col',
                 'searchable' => true,
@@ -428,6 +434,12 @@ class MaintenancesPresenter extends Presenter
                 'searchable' => true,
                 'sortable' => true,
                 'title' => trans('general.huy'),
+            ], [
+                'field' => 'cancelled_shows_cinema',
+                'scope' => 'col',
+                'searchable' => false,
+                'sortable' => true,
+                'title' => trans('general.huy_cinema'),
             ], [
                 'field' => 'is_warranty',
                 'scope' => 'col',

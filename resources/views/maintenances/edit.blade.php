@@ -160,7 +160,15 @@
                     :$item
                     name="notes"
                     type="number"
-					placeholder="Nhập Số Suất Hủy"
+					placeholder="Nhập Số Suất Hủy tính cho Tech"
+                />
+
+                <x-form.row
+                    :label="trans('general.huy_cinema')"
+                    :$item
+                    name="cancelled_shows_cinema"
+                    type="number"
+                    placeholder="Nhập Số Suất Hủy tính cho Rạp"
                 />
 
             </x-box>

@@ -155,7 +155,10 @@ class IncidentReportRepository
         $d['status_label'] = $d['done'] ? 'Hoàn thành' : 'Đang xử lý';
         $d['equipment'] = MaintenanceFormExporter::equipmentLabel($d);
         $d['hall_label'] = $d['hall'] !== '' ? 'Hall '.$d['hall'] : '';
+        // Tech = "Số suất hủy tính cho Tech" (all cancelled-show reports use this);
+        // Rạp = "Số suất hủy tính cho Rạp", always shown as its own column.
         $d['cancelled_count'] = self::cancelledCount((string) $d['cancelled_shows']);
+        $d['cancelled_cinema_count'] = self::cancelledCount((string) ($d['cancelled_cinema'] ?? ''));
 
         return $d;
     }
@@ -230,6 +233,7 @@ class IncidentReportRepository
             'overdue_open' => count(array_filter($rows, fn ($r) => $r['overdue'] && ! $r['done'])),
             'cancelled' => array_sum(array_map(fn ($r) => $r['cancelled_count'], $rows)),
             'cancelled_incidents' => count(array_filter($rows, fn ($r) => $r['cancelled_count'] > 0)),
+            'cancelled_cinema' => array_sum(array_map(fn ($r) => (int) ($r['cancelled_cinema_count'] ?? 0), $rows)),
             'avg_hours' => $doneHours ? array_sum($doneHours) / count($doneHours) : null,
         ];
     }
@@ -245,11 +249,12 @@ class IncidentReportRepository
         $out = [];
         foreach ($rows as $r) {
             $key = $r['site'] !== '' ? $r['site'] : '(Chưa rõ site)';
-            $out[$key] ??= ['site' => $key, 'total' => 0, 'open' => 0, 'overdue' => 0, 'cancelled' => 0];
+            $out[$key] ??= ['site' => $key, 'total' => 0, 'open' => 0, 'overdue' => 0, 'cancelled' => 0, 'cancelled_cinema' => 0];
             $out[$key]['total']++;
             $out[$key]['open'] += $r['done'] ? 0 : 1;
             $out[$key]['overdue'] += $r['overdue'] ? 1 : 0;
             $out[$key]['cancelled'] += $r['cancelled_count'];
+            $out[$key]['cancelled_cinema'] += (int) ($r['cancelled_cinema_count'] ?? 0);
         }
         ksort($out, SORT_NATURAL | SORT_FLAG_CASE);
 
