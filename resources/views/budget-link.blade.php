@@ -1,5 +1,5 @@
-@verbatim
 {{-- budget-link: icon dẫn sang phần mềm Ngân sách & Chi phí (cổng 8080). Gỡ bằng: sudo bash snipeit-budget-link.sh --remove --}}
+@verbatim
 <script>
 (function () {
   try {

@@ -608,6 +608,14 @@
                                 </a>
                             </li>
 
+                            {{-- Bảo hành thiết bị --}}
+                            <li{!! (request()->is('warranty-report*') ? ' class="active" aria-current="page"' : '') !!}>
+                                <a href="{{ route('warranty-report.index') }}">
+                                    <i class="fas fa-shield-alt fa-fw" aria-hidden="true"></i>
+                                    <span>Bảo hành thiết bị</span>
+                                </a>
+                            </li>
+
 
                         @can('view', \App\Models\License::class)
                             <li{!! (request()->is('licenses*') ? ' class="active" aria-current="page"' : '') !!}>

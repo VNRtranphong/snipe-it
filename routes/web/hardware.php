@@ -314,6 +314,17 @@ Route::get('equipment-lookup', [IncidentReportsController::class, 'inventoryPage
         ->push('Tra cứu thiết bị', route('equipment-lookup.index'))
     );
 
+// Bảo hành thiết bị: hạn bảo hành + lịch sử sửa chữa (open to every logged-in user).
+Route::group(['prefix' => 'warranty-report', 'middleware' => ['auth']], function () {
+    Route::get('/', [IncidentReportsController::class, 'warrantyPage'])
+        ->name('warranty-report.index')
+        ->breadcrumbs(fn (Trail $trail) => $trail->parent('home', route('home'))
+            ->push('Bảo hành thiết bị', route('warranty-report.index'))
+        );
+    Route::get('export', [IncidentReportsController::class, 'warrantyExport'])
+        ->name('warranty-report.export');
+});
+
 Route::post('maintenances/bulk',
     [BulkMaintenancesController::class, 'store']
 )->name('maintenances.bulk')->middleware(['auth']);

@@ -14,6 +14,7 @@ use App\Services\MaintenanceForms\IncidentSummaryExporter;
 use App\Services\MaintenanceForms\InventoryRepository;
 use App\Services\MaintenanceForms\CertificateReportService;
 use App\Services\MaintenanceForms\LicenseReportService;
+use App\Services\MaintenanceForms\WarrantyReportService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -35,6 +36,9 @@ use ZipArchive;
  */
 class IncidentReportsController extends Controller
 {
+    /** Max assets listed on the warranty page (export has no limit). */
+    private const WARRANTY_MAX_ROWS = 1500;
+
     public function __construct(
         private IncidentReportRepository $repository,
         private IncidentDocumentService $documents,
@@ -147,6 +151,53 @@ class IncidentReportsController extends Controller
             'inventoryCategories' => Category::where('category_type', 'asset')->orderBy('name')->get(['id', 'name']),
             'inventoryModels' => AssetModel::orderBy('name')->get(['id', 'name', 'model_number', 'category_id']),
         ]);
+    }
+
+    /**
+     * "Bảo hành thiết bị": warranty state of every asset + its repairs.
+     * Repairs are loaded only for the rows shown (max WARRANTY_MAX_ROWS).
+     */
+    public function warrantyPage(Request $request, WarrantyReportService $warranty): View
+    {
+        $filters = WarrantyReportService::filters($request->query());
+        $all = $warranty->assets();
+        $rows = WarrantyReportService::applyFilters($all, $filters);
+        $truncated = count($rows) > self::WARRANTY_MAX_ROWS;
+        if ($truncated) {
+            $rows = array_slice($rows, 0, self::WARRANTY_MAX_ROWS);
+        }
+        $rows = WarrantyReportService::withRepairs($rows, $warranty->repairs(array_column($rows, 'id')));
+
+        return view('incident-reports.warranty', [
+            'filters' => $filters,
+            'rows' => $rows,
+            'truncated' => $truncated,
+            'counts' => WarrantyReportService::counts(WarrantyReportService::applyFilters($all, $filters, false)),
+            'totals' => WarrantyReportService::totals($rows),
+            'options' => WarrantyReportService::options($all),
+            'soonDays' => WarrantyReportService::SOON_DAYS,
+        ]);
+    }
+
+    /** Excel of the current filter (all matching rows, with repair history). */
+    public function warrantyExport(Request $request, WarrantyReportService $warranty): BinaryFileResponse
+    {
+        $filters = WarrantyReportService::filters($request->query());
+        $rows = WarrantyReportService::applyFilters($warranty->assets(), $filters);
+        $rows = WarrantyReportService::withRepairs($rows, $warranty->repairs(array_column($rows, 'id')));
+
+        $scope = array_filter([
+            $filters['state'] === 'all' ? 'Tất cả' : (WarrantyReportService::STATE_LABELS[$filters['state']] ?? 'Còn bảo hành (gồm sắp hết)'),
+            $filters['site'] !== '' ? 'Site: '.$filters['site'] : null,
+            $filters['category'] !== '' ? 'Loại: '.$filters['category'] : null,
+            $filters['q'] !== '' ? 'Tìm: '.$filters['q'] : null,
+        ]);
+        $subtitle = implode('  |  ', $scope).'  |  Xuất lúc '.Carbon::now()->format('d/m/Y H:i');
+
+        $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'warranty_'.Str::random(16).'.xlsx';
+        WarrantyReportService::export($rows, $subtitle, $path);
+
+        return response()->download($path, 'Bao_hanh_thiet_bi_'.date('Ymd_Hi').'.xlsx')->deleteFileAfterSend(true);
     }
 
     /**
